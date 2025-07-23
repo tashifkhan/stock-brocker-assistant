@@ -110,3 +110,17 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer components {
+  /* Ensure dropdowns have proper background and z-index */
+  [role="menu"],
+  [role="listbox"],
+  .dropdown-content {
+    @apply bg-popover border border-border shadow-lg z-50;
+  }
+  
+  /* Fix for sidebar toggle button */
+  .sidebar-trigger {
+    @apply z-40;
+  }
+}

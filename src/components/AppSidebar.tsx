@@ -52,16 +52,11 @@ export function AppSidebar() {
     isActive ? "bg-primary text-primary-foreground font-medium" : "hover:bg-muted/50"
 
   return (
-    <Sidebar
-      className={collapsed ? "w-14" : "w-60"}
-      collapsible="icon"
-    >
-      <SidebarTrigger className="m-2 self-end" />
-
-      <SidebarContent>
+    <Sidebar collapsible="icon">
+      <SidebarContent className="bg-card border-r">
         {/* Main Tools */}
         <SidebarGroup>
-          <SidebarGroupLabel className="text-primary font-semibold">
+          <SidebarGroupLabel className="text-primary font-semibold px-2">
             Financial AI Suite
           </SidebarGroupLabel>
           <SidebarGroupContent>
@@ -71,7 +66,7 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild>
                     <NavLink to={item.url} end className={getNavCls}>
                       <item.icon className="mr-2 h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
+                      <span>{item.title}</span>
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -82,7 +77,7 @@ export function AppSidebar() {
 
         {/* Admin Section */}
         <SidebarGroup>
-          <SidebarGroupLabel className="text-muted-foreground">
+          <SidebarGroupLabel className="text-muted-foreground px-2">
             Administration
           </SidebarGroupLabel>
           <SidebarGroupContent>
@@ -92,7 +87,7 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild>
                     <NavLink to={item.url} className={getNavCls}>
                       <item.icon className="mr-2 h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
+                      <span>{item.title}</span>
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -110,7 +105,7 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild>
                     <NavLink to={item.url} className={getNavCls}>
                       <item.icon className="mr-2 h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
+                      <span>{item.title}</span>
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -118,7 +113,7 @@ export function AppSidebar() {
               <SidebarMenuItem>
                 <SidebarMenuButton className="hover:bg-destructive/10 hover:text-destructive">
                   <LogOut className="mr-2 h-4 w-4" />
-                  {!collapsed && <span>Logout</span>}
+                  <span>Logout</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
