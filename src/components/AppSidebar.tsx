@@ -49,24 +49,24 @@ export function AppSidebar() {
 
   const isActive = (path: string) => currentPath === path
   const getNavCls = ({ isActive }: { isActive: boolean }) =>
-    isActive ? "bg-primary text-primary-foreground font-medium" : "hover:bg-muted/50"
+    isActive ? "bg-primary text-primary-foreground font-medium" : "text-foreground hover:bg-muted hover:text-foreground"
 
   return (
-    <Sidebar collapsible="icon">
-      <SidebarContent className="bg-card border-r">
+    <Sidebar collapsible="icon" className="bg-card text-card-foreground">
+      <SidebarContent className="bg-card border-r text-card-foreground">
         {/* Main Tools */}
         <SidebarGroup>
-          <SidebarGroupLabel className="text-primary font-semibold px-2">
+          <SidebarGroupLabel className="text-primary font-semibold px-2 text-sm">
             Financial AI Suite
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {mainItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
+                  <SidebarMenuButton asChild className="text-foreground hover:text-foreground">
                     <NavLink to={item.url} end className={getNavCls}>
                       <item.icon className="mr-2 h-4 w-4" />
-                      <span>{item.title}</span>
+                      <span className="text-current">{item.title}</span>
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -77,17 +77,17 @@ export function AppSidebar() {
 
         {/* Admin Section */}
         <SidebarGroup>
-          <SidebarGroupLabel className="text-muted-foreground px-2">
+          <SidebarGroupLabel className="text-muted-foreground px-2 text-sm">
             Administration
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {adminItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
+                  <SidebarMenuButton asChild className="text-foreground hover:text-foreground">
                     <NavLink to={item.url} className={getNavCls}>
                       <item.icon className="mr-2 h-4 w-4" />
-                      <span>{item.title}</span>
+                      <span className="text-current">{item.title}</span>
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -102,18 +102,18 @@ export function AppSidebar() {
             <SidebarMenu>
               {settingsItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
+                  <SidebarMenuButton asChild className="text-foreground hover:text-foreground">
                     <NavLink to={item.url} className={getNavCls}>
                       <item.icon className="mr-2 h-4 w-4" />
-                      <span>{item.title}</span>
+                      <span className="text-current">{item.title}</span>
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
               <SidebarMenuItem>
-                <SidebarMenuButton className="hover:bg-destructive/10 hover:text-destructive">
+                <SidebarMenuButton className="text-foreground hover:bg-destructive/10 hover:text-destructive">
                   <LogOut className="mr-2 h-4 w-4" />
-                  <span>Logout</span>
+                  <span className="text-current">Logout</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
