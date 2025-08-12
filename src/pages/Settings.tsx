@@ -66,7 +66,7 @@ export default function Settings() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="firstName">First Name</Label>
-                  <Input id="firstName" defaultValue="John" />
+                  <Input id="firstName" defaultValue="Abcd" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="lastName">Last Name</Label>
@@ -74,11 +74,11 @@ export default function Settings() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" defaultValue="john.doe@company.com" />
+                  <Input id="email" type="email" defaultValue="abcd.efgh@company.com" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="phone">Phone</Label>
-                  <Input id="phone" defaultValue="+1 (555) 123-4567" />
+                  <Input id="phone" defaultValue="+91 (555) 123-4567" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="company">Company</Label>
