@@ -5,3 +5,4 @@ nltk_data
 venv
 .venv
 .DS_Store
+articles.json
