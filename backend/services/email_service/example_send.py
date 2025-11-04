@@ -8,7 +8,7 @@ the sample message and env hints so you can test safely.
 from __future__ import annotations
 
 import os
-from backend.email_service import send_email
+from sender import send_email
 
 
 def main() -> None:
