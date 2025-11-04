@@ -142,57 +142,39 @@ def scrape(websites: list, count: int = 5) -> list:
     return articles_data
 
 
-def save_to_json(data, output_file):
+def scrape_articles(
+    websites: list | None = None, count: int = 5, max_articles: int = 1500
+) -> dict:
     """
-    Prepends the given data to an existing JSON file or creates a new file if none exists.
+    Scrapes articles from a list of websites and returns structured data.
 
     Args:
-        data (list): The data to save (list of dictionaries).
-        output_file (str): The filename to save the data into.
+        websites (list): A list of website URLs to scrape. If None, uses default websites.
+        count (int): Maximum number of articles to fetch per website.
+        max_articles (int): Maximum number of articles to return after filtering.
+
+    Returns:
+        dict: A dictionary containing the scraped articles and metadata.
     """
-    try:
+    if websites is None:
+        websites = [
+            "http://finance.yahoo.com/",
+            "https://www.bloomberg.com/asia",
+            "https://www.marketwatch.com/",
+            "https://www.reuters.com/business/finance/",
+        ]
 
-        if os.path.exists(output_file):
-            with open(
-                output_file,
-                "r",
-                encoding="utf-8",
-            ) as json_file:
-                existing_data = json.load(json_file)
-
-        else:
-            existing_data = []
-
-        # Prepend new data to existing data
-        combined_data = data + existing_data
-
-        # Save updated data back to the file
-        with open(output_file, "w", encoding="utf-8") as json_file:
-            json.dump(combined_data, json_file, ensure_ascii=False, indent=4)
-
-        print(f"Data saved to {output_file}")
-
-    except Exception as e:
-        print(f"Failed to save data to JSON. Error: {e}")
-
-
-def main():
-    import os
-
-    # Scrape articles from websites
-    websites = [
-        "http://finance.yahoo.com/",
-        "https://www.bloomberg.com/asia",
-        "https://www.marketwatch.com/,",
-        "https://www.reuters.com/business/finance/",
-    ]
-
-    results = scrape(websites, count=5000)
+    # Scrape articles
+    results = scrape(websites, count=count)
     valid_results = [r for r in results if r.get("title") and r.get("text")]
 
     if not valid_results:
-        print("No valid results to save")
-        return
+        return {
+            "status": "success",
+            "message": "No valid articles found",
+            "total_articles": 0,
+            "articles": [],
+        }
 
     # Remove unwanted articles by title and text
     unwanted_texts = [
@@ -214,18 +196,37 @@ def main():
         )
     ]
 
-    # Limit to 1500 most recent articles by publish_date (if available)
+    # Limit to max_articles most recent articles by publish_date (if available)
     def get_date(article):
         return article.get("publish_date") or "0000-00-00"
 
     filtered_results.sort(key=get_date)
-    if len(filtered_results) > 1500:
-        filtered_results = filtered_results[-1500:]
+    if len(filtered_results) > max_articles:
+        filtered_results = filtered_results[-max_articles:]
 
-    # Save to JSON file
-    output_file = os.path.join(os.path.dirname(__file__), "articles.json")
-    save_to_json(filtered_results, output_file)
-    print(f"Scraping completed! Articles saved: {len(filtered_results)}")
+    return {
+        "status": "success",
+        "message": f"Successfully scraped {len(filtered_results)} articles",
+        "total_articles": len(filtered_results),
+        "articles": filtered_results,
+    }
+
+
+def main():
+    """
+    Main function for backwards compatibility and testing.
+    Now uses scrape_articles and optionally saves to JSON.
+    """
+    result = scrape_articles(count=5000)
+
+    if result["status"] == "success" and result["total_articles"] > 0:
+        # Optionally save to JSON file for backwards compatibility
+        output_file = os.path.join(os.path.dirname(__file__), "articles.json")
+        with open(output_file, "w", encoding="utf-8") as json_file:
+            json.dump(result["articles"], json_file, ensure_ascii=False, indent=4)
+        print(f"Scraping completed! Articles saved: {result['total_articles']}")
+    else:
+        print(result["message"])
 
 
 if __name__ == "__main__":

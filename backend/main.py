@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from routes import market_filling
+from routes import market_filling, article_scrapper
 
 
 app = FastAPI(title="Stock Broker Assistant")
@@ -14,6 +14,7 @@ def health() -> dict:
 
 
 app.include_router(market_filling.router)
+app.include_router(article_scrapper.router)
 
 
 if __name__ == "__main__":
