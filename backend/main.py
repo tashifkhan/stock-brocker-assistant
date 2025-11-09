@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routes import market_filling, article_scrapper, report_analysis, financial_data, editorial, market_summary, admin_settings
+from routes import market_filling, article_scrapper, report_analysis, financial_data, editorial, editorial_assistant, market_summary, admin_settings
 
 
 app = FastAPI(title="Stock Broker Assistant")
@@ -29,6 +29,7 @@ app.include_router(article_scrapper.router)
 app.include_router(report_analysis.router)
 app.include_router(financial_data.router)
 app.include_router(editorial.router)
+app.include_router(editorial_assistant.router)
 app.include_router(market_summary.router)
 app.include_router(admin_settings.router)
 
