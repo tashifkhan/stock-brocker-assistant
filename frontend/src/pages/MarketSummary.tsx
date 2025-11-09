@@ -1,392 +1,288 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  Download, 
+import { useMemo, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import {
+  TrendingUp,
+  TrendingDown,
+  Download,
   Calendar,
   BarChart3,
-  DollarSign,
-  Volume2,
-  Activity
-} from "lucide-react"
+  Loader2,
+  AlertCircle,
+} from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  useMarketSummaryDaily,
+  useMarketSectors,
+  useMarketWatchlist,
+} from "@/hooks/useApi";
 
-const marketIndices = [
-  {
-    name: "S&P 500",
-    symbol: "SPX",
-    price: "4,567.23",
-    change: "+23.45",
-    changePercent: "+0.52%",
-    trend: "up"
-  },
-  {
-    name: "Dow Jones",
-    symbol: "DJI",
-    price: "35,234.12",
-    change: "+156.78",
-    changePercent: "+0.45%",
-    trend: "up"
-  },
-  {
-    name: "NASDAQ",
-    symbol: "IXIC",
-    price: "14,789.56",
-    change: "-45.23",
-    changePercent: "-0.31%",
-    trend: "down"
-  },
-  {
-    name: "Russell 2000",
-    symbol: "RUT",
-    price: "2,123.45",
-    change: "+12.34",
-    changePercent: "+0.58%",
-    trend: "up"
-  }
-]
-
-const marketData = [
-  { metric: "Advancing Stocks", value: "1,847", percentage: "58%" },
-  { metric: "Declining Stocks", value: "1,342", percentage: "42%" },
-  { metric: "Unchanged", value: "123", percentage: "4%" },
-  { metric: "New 52-Week Highs", value: "89", percentage: "-" },
-  { metric: "New 52-Week Lows", value: "34", percentage: "-" },
-  { metric: "Total Volume", value: "4.2B", percentage: "+12%" }
-]
-
-const topPerformers = [
-  { symbol: "NVDA", name: "NVIDIA Corp", price: "$892.45", change: "+5.67%", volume: "45.2M" },
-  { symbol: "TSLA", name: "Tesla Inc", price: "$245.67", change: "+4.23%", volume: "78.9M" },
-  { symbol: "AAPL", name: "Apple Inc", price: "$185.34", change: "+3.12%", volume: "56.7M" },
-  { symbol: "META", name: "Meta Platforms", price: "$334.56", change: "+2.89%", volume: "23.4M" },
-  { symbol: "GOOGL", name: "Alphabet Inc", price: "$142.78", change: "+2.45%", volume: "34.5M" }
-]
-
-const bottomPerformers = [
-  { symbol: "NFLX", name: "Netflix Inc", price: "$456.78", change: "-4.56%", volume: "12.3M" },
-  { symbol: "AMZN", name: "Amazon.com Inc", price: "$134.56", change: "-3.45%", volume: "67.8M" },
-  { symbol: "MSFT", name: "Microsoft Corp", price: "$378.90", change: "-2.34%", volume: "45.6M" },
-  { symbol: "CRM", name: "Salesforce Inc", price: "$234.56", change: "-2.12%", volume: "8.9M" },
-  { symbol: "UBER", name: "Uber Technologies", price: "$67.89", change: "-1.89%", volume: "15.6M" }
-]
-
-const mostTraded = [
-  { symbol: "TSLA", name: "Tesla Inc", volume: "78.9M", value: "$19.4B" },
-  { symbol: "AMZN", name: "Amazon.com Inc", volume: "67.8M", value: "$9.1B" },
-  { symbol: "AAPL", name: "Apple Inc", volume: "56.7M", value: "$10.5B" },
-  { symbol: "MSFT", name: "Microsoft Corp", volume: "45.6M", value: "$17.3B" },
-  { symbol: "NVDA", name: "NVIDIA Corp", volume: "45.2M", value: "$40.3B" }
-]
-
-const analystQuotes = [
-  {
-    analyst: "Sarah Johnson",
-    firm: "Goldman Sachs",
-    quote: "The market's resilience in the face of economic uncertainty demonstrates strong underlying fundamentals, particularly in the technology sector.",
-    time: "2 hours ago"
-  },
-  {
-    analyst: "Michael Chen",
-    firm: "Morgan Stanley",
-    quote: "We're seeing a rotation into quality names as investors seek stability amid volatile market conditions.",
-    time: "3 hours ago"
-  },
-  {
-    analyst: "Emily Rodriguez",
-    firm: "JP Morgan",
-    quote: "The divergence between growth and value stocks continues to present interesting opportunities for active managers.",
-    time: "4 hours ago"
-  }
-]
-
-const previousSummaries = [
-  { date: "2025-07-22", title: "Tech Rally Drives Market Higher", status: "published" },
-  { date: "2025-07-21", title: "Mixed Trading as Earnings Season Continues", status: "published" },
-  { date: "2025-07-20", title: "Financial Sector Leads Market Gains", status: "published" },
-  { date: "2025-07-19", title: "Volatility Returns Amid Economic Data", status: "published" }
-]
+function formatChange(value: number) {
+  return `${value > 0 ? "+" : ""}${value.toFixed(2)}%`;
+}
 
 export default function MarketSummary() {
+  const [dateInput, setDateInput] = useState<string>("");
+  const [watchlistInput, setWatchlistInput] = useState("AAPL,MSFT,GOOGL");
+  const [watchlistSymbols, setWatchlistSymbols] = useState<string[]>(["AAPL", "MSFT", "GOOGL"]);
+
+  const dailySummaryQuery = useMarketSummaryDaily(dateInput || undefined);
+  const sectorsQuery = useMarketSectors(dateInput || undefined);
+  const watchlistQuery = useMarketWatchlist(watchlistSymbols);
+
+  const isLoading = dailySummaryQuery.isLoading || dailySummaryQuery.isPending;
+  const hasError = dailySummaryQuery.isError;
+
+  const handleWatchlistUpdate = () => {
+    const symbols = watchlistInput
+      .split(",")
+      .map((symbol) => symbol.trim().toUpperCase())
+      .filter(Boolean);
+    setWatchlistSymbols(symbols);
+  };
+
+  const indices = dailySummaryQuery.data?.indices ?? [];
+  const topGainers = dailySummaryQuery.data?.top_gainers ?? [];
+  const topLosers = dailySummaryQuery.data?.top_losers ?? [];
+  const marketNews = dailySummaryQuery.data?.market_news ?? [];
+
+  const sectorData = useMemo(() => {
+    if (!sectorsQuery.data?.sectors) return [] as Array<[string, Record<string, unknown>]>;
+    return Object.entries(sectorsQuery.data.sectors);
+  }, [sectorsQuery.data]);
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="space-y-2">
           <h1 className="text-3xl font-bold text-foreground">Daily Market Summary</h1>
           <p className="text-muted-foreground">
-            Automated daily financial market analysis and insights for July 23, 2025
+            Automated financial market insights pulled directly from the backend service.
           </p>
         </div>
-        <div className="flex items-center space-x-2">
-          <Button variant="outline" size="sm">
-            <Calendar className="h-4 w-4 mr-2" />
-            Previous Days
-          </Button>
-          <Button size="sm">
-            <Download className="h-4 w-4 mr-2" />
-            Download PDF
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-2">
+            <Input
+              type="date"
+              value={dateInput}
+              onChange={(event) => setDateInput(event.target.value)}
+              className="w-full sm:w-auto"
+            />
+            <Button variant="outline" onClick={() => dailySummaryQuery.refetch()}>
+              <Calendar className="mr-2 h-4 w-4" />
+              Refresh
+            </Button>
+          </div>
+          <Button size="sm" variant="outline">
+            <Download className="mr-2 h-4 w-4" />
+            Export snapshot
           </Button>
         </div>
       </div>
 
-      {/* Market Indices */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
+          <CardTitle className="flex items-center gap-2">
             <BarChart3 className="h-5 w-5" />
-            <span>Major Market Indices</span>
+            Major Market Indices
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {marketIndices.map((index) => (
-              <div key={index.symbol} className="p-4 border rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-semibold">{index.name}</h3>
-                  {index.trend === 'up' ? (
-                    <TrendingUp className="h-4 w-4 text-green-600" />
-                  ) : (
-                    <TrendingDown className="h-4 w-4 text-red-600" />
-                  )}
+          {isLoading ? (
+            <div className="flex items-center justify-center py-10 text-muted-foreground">
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              Loading latest market snapshot…
+            </div>
+          ) : hasError ? (
+            <div className="flex items-center gap-2 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+              <AlertCircle className="h-4 w-4" />
+              <span>{dailySummaryQuery.error instanceof Error ? dailySummaryQuery.error.message : "Unable to load market summary."}</span>
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              {indices.map((index) => (
+                <div key={index.name} className="rounded-lg border p-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold">{index.name}</h3>
+                    {index.trend === "up" ? (
+                      <TrendingUp className="h-4 w-4 text-green-600" />
+                    ) : index.trend === "down" ? (
+                      <TrendingDown className="h-4 w-4 text-red-600" />
+                    ) : null}
+                  </div>
+                  <p className="mt-2 text-2xl font-bold">{index.value.toLocaleString()}</p>
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className={index.change >= 0 ? "text-green-600" : "text-red-600"}>
+                      {index.change >= 0 ? "+" : ""}
+                      {index.change.toFixed(2)}
+                    </span>
+                    <Badge variant={index.change_percent >= 0 ? "secondary" : "destructive"}>
+                      {formatChange(index.change_percent)}
+                    </Badge>
+                  </div>
                 </div>
-                <p className="text-2xl font-bold">{index.price}</p>
-                <div className="flex items-center space-x-2">
-                  <span className={`text-sm font-medium ${
-                    index.trend === 'up' ? 'text-green-600' : 'text-red-600'
-                  }`}>
-                    {index.change}
-                  </span>
-                  <span className={`text-sm ${
-                    index.trend === 'up' ? 'text-green-600' : 'text-red-600'
-                  }`}>
-                    ({index.changePercent})
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Market Data */}
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Activity className="h-5 w-5" />
-              <span>Market Breadth</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {marketData.map((data, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">{data.metric}</span>
-                  <div className="flex items-center space-x-2">
-                    <span className="font-medium">{data.value}</span>
-                    {data.percentage !== '-' && (
-                      <Badge variant="secondary" className="text-xs">
-                        {data.percentage}
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <DollarSign className="h-5 w-5" />
-              <span>Market Overview</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                <h3 className="font-semibold text-green-800 mb-2">Bullish Sentiment</h3>
-                <p className="text-sm text-green-700">
-                  Market showing resilience with 58% of stocks advancing. Technology sector 
-                  leading gains with strong institutional buying.
-                </p>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div className="text-center p-3 bg-muted/20 rounded-lg">
-                  <p className="text-2xl font-bold text-green-600">+0.4%</p>
-                  <p className="text-sm text-muted-foreground">Avg. Index Change</p>
-                </div>
-                <div className="text-center p-3 bg-muted/20 rounded-lg">
-                  <p className="text-2xl font-bold">4.2B</p>
-                  <p className="text-sm text-muted-foreground">Total Volume</p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Top/Bottom Performers */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2 text-green-600">
+            <CardTitle className="flex items-center gap-2 text-green-600">
               <TrendingUp className="h-5 w-5" />
-              <span>Top Performers</span>
+              Top Movers
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Symbol</TableHead>
-                  <TableHead>Price</TableHead>
-                  <TableHead>Change</TableHead>
-                  <TableHead>Volume</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {topPerformers.map((stock) => (
-                  <TableRow key={stock.symbol}>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{stock.symbol}</div>
-                        <div className="text-xs text-muted-foreground">{stock.name}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-medium">{stock.price}</TableCell>
-                    <TableCell className="text-green-600 font-medium">{stock.change}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{stock.volume}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2 text-red-600">
-              <TrendingDown className="h-5 w-5" />
-              <span>Bottom Performers</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Symbol</TableHead>
-                  <TableHead>Price</TableHead>
-                  <TableHead>Change</TableHead>
-                  <TableHead>Volume</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {bottomPerformers.map((stock) => (
-                  <TableRow key={stock.symbol}>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{stock.symbol}</div>
-                        <div className="text-xs text-muted-foreground">{stock.name}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-medium">{stock.price}</TableCell>
-                    <TableCell className="text-red-600 font-medium">{stock.change}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{stock.volume}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Most Traded & Analyst Quotes */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Volume2 className="h-5 w-5" />
-              <span>Most Traded Securities</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Symbol</TableHead>
-                  <TableHead>Volume</TableHead>
-                  <TableHead>Value</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {mostTraded.map((stock) => (
-                  <TableRow key={stock.symbol}>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{stock.symbol}</div>
-                        <div className="text-xs text-muted-foreground">{stock.name}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-medium">{stock.volume}</TableCell>
-                    <TableCell className="font-medium">{stock.value}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Analyst Commentary</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {analystQuotes.map((quote, index) => (
-                <div key={index} className="p-4 bg-muted/20 rounded-lg">
-                  <p className="text-sm mb-2">"{quote.quote}"</p>
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>{quote.analyst}, {quote.firm}</span>
-                    <span>{quote.time}</span>
+          <CardContent className="space-y-4">
+            <div>
+              <p className="mb-2 text-xs uppercase text-muted-foreground">Gainers</p>
+              <div className="space-y-2">
+                {topGainers.slice(0, 5).map((item, index) => (
+                  <div key={`${item.symbol}-${index}`} className="flex items-center justify-between text-sm">
+                    <span className="font-medium">{item.symbol}</span>
+                    <Badge className="bg-green-100 text-green-700">
+                      {formatChange(item.change_percent)}
+                    </Badge>
                   </div>
-                </div>
-              ))}
+                ))}
+                {topGainers.length === 0 && (
+                  <p className="text-sm text-muted-foreground">No gainers reported.</p>
+                )}
+              </div>
+            </div>
+            <div className="border-t pt-4">
+              <p className="mb-2 text-xs uppercase text-muted-foreground">Losers</p>
+              <div className="space-y-2">
+                {topLosers.slice(0, 5).map((item, index) => (
+                  <div key={`${item.symbol}-${index}`} className="flex items-center justify-between text-sm">
+                    <span className="font-medium">{item.symbol}</span>
+                    <Badge className="bg-red-100 text-red-700">
+                      {formatChange(item.change_percent)}
+                    </Badge>
+                  </div>
+                ))}
+                {topLosers.length === 0 && (
+                  <p className="text-sm text-muted-foreground">No losers reported.</p>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Latest Market Headlines</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {marketNews.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No news items available for this date.</p>
+            ) : (
+              marketNews.map((story, index) => (
+                <div key={index} className="rounded-lg border p-3">
+                  <p className="text-sm font-medium">{story.title}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {story.source} • {new Date(story.timestamp).toLocaleTimeString()}
+                  </p>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Previous Summaries */}
       <Card>
         <CardHeader>
-          <CardTitle>Previous Market Summaries</CardTitle>
+          <CardTitle>Sector Performance</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {previousSummaries.map((summary, index) => (
-              <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="font-medium">{summary.title}</p>
-                    <p className="text-sm text-muted-foreground">{summary.date}</p>
-                  </div>
+          {sectorsQuery.isLoading ? (
+            <div className="flex items-center justify-center py-6 text-sm text-muted-foreground">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Loading sectors…
+            </div>
+          ) : sectorData.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No sector data available.</p>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {sectorData.map(([sector, details]) => (
+                <div key={sector} className="rounded-lg border p-4">
+                  <p className="text-sm font-semibold">{sector}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Change: {formatChange(Number((details as Record<string, number>).change ?? 0))}
+                  </p>
+                  {Array.isArray((details as Record<string, unknown>).leaders) && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Leaders: {(details as Record<string, string[]>).leaders.join(", ")}
+                    </p>
+                  )}
                 </div>
-                <div className="flex items-center space-x-2">
-                  <Badge variant="secondary">Published</Badge>
-                  <Button variant="outline" size="sm">View</Button>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle>Watchlist Performance</CardTitle>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <Input
+                value={watchlistInput}
+                onChange={(event) => setWatchlistInput(event.target.value)}
+                placeholder="Comma separated symbols"
+              />
+              <Button size="sm" onClick={handleWatchlistUpdate} disabled={watchlistQuery.isPending}>
+                Update
+              </Button>
+            </div>
           </div>
+        </CardHeader>
+        <CardContent>
+          {watchlistSymbols.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Add at least one ticker to see watchlist performance.
+            </p>
+          ) : watchlistQuery.isLoading || watchlistQuery.isPending ? (
+            <div className="flex items-center justify-center py-6 text-sm text-muted-foreground">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Loading watchlist…
+            </div>
+          ) : watchlistQuery.isError ? (
+            <div className="flex items-center gap-2 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+              <AlertCircle className="h-4 w-4" />
+              <span>{watchlistQuery.error instanceof Error ? watchlistQuery.error.message : "Unable to load watchlist."}</span>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Symbol</TableHead>
+                  <TableHead>Price</TableHead>
+                  <TableHead>Change</TableHead>
+                  <TableHead>Volume</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {watchlistQuery.data?.watchlist?.map((item, index) => (
+                  <TableRow key={`${item.symbol}-${index}`}>
+                    <TableCell className="font-medium">{item.symbol}</TableCell>
+                    <TableCell>{item.price?.toLocaleString?.() ?? item.price}</TableCell>
+                    <TableCell className={item.change_percent >= 0 ? "text-green-600" : "text-red-600"}>
+                      {formatChange(item.change_percent)}
+                    </TableCell>
+                    <TableCell>{item.volume?.toLocaleString?.() ?? item.volume}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

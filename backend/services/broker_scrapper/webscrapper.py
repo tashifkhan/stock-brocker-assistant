@@ -158,10 +158,11 @@ def scrape_articles(
     """
     if websites is None:
         websites = [
-            "http://finance.yahoo.com/",
+            "http://livemint.com/",
             "https://www.bloomberg.com/asia",
             "https://www.marketwatch.com/",
             "https://www.reuters.com/business/finance/",
+            "https://www.cnbctv18.com/"
         ]
 
     # Scrape articles

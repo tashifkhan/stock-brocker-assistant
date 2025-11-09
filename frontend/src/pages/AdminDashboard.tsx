@@ -1,515 +1,419 @@
+import { useEffect, useMemo, useState } from "react";
+import {
+  Shield,
+  Users,
+  Server,
+  Activity,
+  HardDrive,
+  Cpu,
+  Gauge,
+  RefreshCw,
+  Settings,
+  Send,
+  ClipboardList,
+} from "lucide-react";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-	Table,
-	TableBody,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
 import {
-	Users,
-	FileBarChart,
-	Activity,
-	TrendingUp,
-	Shield,
-	Settings,
-	Download,
-	Edit,
-	Eye,
-	Trash2,
-} from "lucide-react";
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
+import { useToast } from "@/hooks/use-toast";
+import {
+  useSystemMetrics,
+  useAdminUsers,
+  useAdminLogs,
+  useAdminSettings,
+  useUpdateAdminSettings,
+} from "@/hooks/useApi";
+import type { SystemMetrics } from "@/lib/api";
 
-const systemStats = [
-	{
-		title: "Total Users",
-		value: "45",
-		change: "+3 this month",
-		icon: Users,
-		color: "text-blue-600",
-	},
-	{
-		title: "Documents Processed",
-		value: "1,247",
-		change: "+156 this week",
-		icon: FileBarChart,
-		color: "text-green-600",
-	},
-	{
-		title: "API Requests",
-		value: "23,456",
-		change: "+12% from last month",
-		icon: Activity,
-		color: "text-purple-600",
-	},
-	{
-		title: "System Uptime",
-		value: "99.9%",
-		change: "Last 30 days",
-		icon: TrendingUp,
-		color: "text-orange-600",
-	},
-];
+type SettingsFormValues = {
+  key: string;
+  value: string;
+};
 
-const userData = [
-	{
-		id: 1,
-		name: "Abcd Efgh",
-		email: "abcd.efgh@company.com",
-		role: "Admin",
-		lastActive: "2025-07-23",
-		documentsProcessed: 89,
-		status: "active",
-	},
-	{
-		id: 2,
-		name: "Sarah Johnson",
-		email: "sarah.j@company.com",
-		role: "Analyst",
-		lastActive: "2025-07-23",
-		documentsProcessed: 156,
-		status: "active",
-	},
-	{
-		id: 3,
-		name: "Michael Chen",
-		email: "m.chen@company.com",
-		role: "Editor",
-		lastActive: "2025-07-22",
-		documentsProcessed: 67,
-		status: "active",
-	},
-	{
-		id: 4,
-		name: "Emily Rodriguez",
-		email: "emily.r@company.com",
-		role: "Analyst",
-		lastActive: "2025-07-20",
-		documentsProcessed: 234,
-		status: "inactive",
-	},
-	{
-		id: 5,
-		name: "David Park",
-		email: "d.park@company.com",
-		role: "Viewer",
-		lastActive: "2025-07-19",
-		documentsProcessed: 12,
-		status: "active",
-	},
-];
+function formatNumber(value: number | undefined, fractionDigits = 0): string {
+  if (value === undefined || Number.isNaN(value)) {
+    return "--";
+  }
+  return value.toLocaleString(undefined, {
+    maximumFractionDigits: fractionDigits,
+    minimumFractionDigits: fractionDigits,
+  });
+}
 
-const toolUsageStats = [
-	{
-		tool: "Financial Data Analysis",
-		users: 28,
-		documents: 456,
-		avgTime: "8.5 min",
-		satisfaction: "94%",
-	},
-	{
-		tool: "Editorial Assistant",
-		users: 15,
-		documents: 234,
-		avgTime: "12.3 min",
-		satisfaction: "89%",
-	},
-	{
-		tool: "Broker Report Articles",
-		users: 12,
-		documents: 89,
-		avgTime: "15.7 min",
-		satisfaction: "92%",
-	},
-	{
-		tool: "Market Summary",
-		users: 35,
-		documents: 156,
-		avgTime: "3.2 min",
-		satisfaction: "96%",
-	},
-	{
-		tool: "Corporate Filings Alerts",
-		users: 22,
-		documents: 312,
-		avgTime: "2.1 min",
-		satisfaction: "91%",
-	},
-];
-
-const systemHealth = [
-	{
-		service: "API Gateway",
-		status: "healthy",
-		uptime: "99.9%",
-		response: "145ms",
-	},
-	{
-		service: "Document Processing",
-		status: "healthy",
-		uptime: "99.8%",
-		response: "2.3s",
-	},
-	{
-		service: "AI Analysis Engine",
-		status: "warning",
-		uptime: "98.5%",
-		response: "3.7s",
-	},
-	{ service: "Database", status: "healthy", uptime: "100%", response: "12ms" },
-	{
-		service: "File Storage",
-		status: "healthy",
-		uptime: "99.9%",
-		response: "89ms",
-	},
-];
-
-const recentActivity = [
-	{
-		user: "Sarah Johnson",
-		action: "Generated market summary report",
-		timestamp: "2025-07-23 14:30",
-		tool: "Market Summary",
-	},
-	{
-		user: "Michael Chen",
-		action: "Processed financial document",
-		timestamp: "2025-07-23 14:15",
-		tool: "Financial Data Analysis",
-	},
-	{
-		user: "Emily Rodriguez",
-		action: "Created broker report article",
-		timestamp: "2025-07-23 13:45",
-		tool: "Broker Report Articles",
-	},
-	{
-		user: "Abcd Efgh",
-		action: "Added 3 companies to watchlist",
-		timestamp: "2025-07-23 13:20",
-		tool: "Corporate Filings Alerts",
-	},
-	{
-		user: "David Park",
-		action: "Used editorial suggestions",
-		timestamp: "2025-07-23 12:55",
-		tool: "Editorial Assistant",
-	},
-];
+function formatTimestamp(value: string | undefined): string {
+  if (!value) return "--";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+  return parsed.toLocaleString();
+}
 
 export default function AdminDashboard() {
-	return (
-		<div className="space-y-6">
-			{/* Header */}
-			<div className="flex items-center justify-between">
-				<div className="space-y-2">
-					<h1 className="text-3xl font-bold text-foreground flex items-center space-x-2">
-						<Shield className="h-8 w-8 text-primary" />
-						<span>Admin Dashboard</span>
-					</h1>
-					<p className="text-muted-foreground">
-						System overview and user management for the Financial AI Suite
-					</p>
-				</div>
-				<Button>
-					<Download className="h-4 w-4 mr-2" />
-					Export Analytics
-				</Button>
-			</div>
+  const { toast } = useToast();
+  const { data: metricsData, isLoading: metricsLoading, error: metricsError } =
+    useSystemMetrics();
+  const { data: usersData, isLoading: usersLoading, error: usersError } =
+    useAdminUsers(25, 0);
+  const { data: logsData, isLoading: logsLoading, error: logsError } =
+    useAdminLogs(25);
+  const { data: settingsData, isLoading: settingsLoading } = useAdminSettings();
+  const updateSettings = useUpdateAdminSettings();
 
-			{/* System Stats */}
-			<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-				{systemStats.map((stat) => (
-					<Card key={stat.title}>
-						<CardContent className="p-4">
-							<div className="flex items-center justify-between">
-								<div>
-									<p className="text-sm text-muted-foreground">{stat.title}</p>
-									<p className="text-2xl font-bold">{stat.value}</p>
-									<p className="text-xs text-muted-foreground mt-1">
-										{stat.change}
-									</p>
-								</div>
-								<stat.icon className={`h-8 w-8 ${stat.color}`} />
-							</div>
-						</CardContent>
-					</Card>
-				))}
-			</div>
+  const metrics = metricsData?.metrics as SystemMetrics | undefined;
+  const users = usersData?.users ?? [];
+  const logs = logsData?.logs ?? [];
+  const appSettings = settingsData?.settings ?? {};
 
-			<Tabs defaultValue="users" className="space-y-4">
-				<TabsList>
-					<TabsTrigger value="users">User Management</TabsTrigger>
-					<TabsTrigger value="usage">Tool Usage</TabsTrigger>
-					<TabsTrigger value="system">System Health</TabsTrigger>
-					<TabsTrigger value="activity">Recent Activity</TabsTrigger>
-				</TabsList>
+  const [customSetting, setCustomSetting] = useState("log_level");
+  const [customValue, setCustomValue] = useState("");
 
-				<TabsContent value="users">
-					<Card>
-						<CardHeader>
-							<div className="flex items-center justify-between">
-								<CardTitle>User Management</CardTitle>
-								<Button>
-									<Users className="h-4 w-4 mr-2" />
-									Add User
-								</Button>
-							</div>
-						</CardHeader>
-						<CardContent>
-							<Table>
-								<TableHeader>
-									<TableRow>
-										<TableHead>User</TableHead>
-										<TableHead>Role</TableHead>
-										<TableHead>Last Active</TableHead>
-										<TableHead>Documents</TableHead>
-										<TableHead>Status</TableHead>
-										<TableHead>Actions</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{userData.map((user) => (
-										<TableRow key={user.id}>
-											<TableCell>
-												<div>
-													<div className="font-medium">{user.name}</div>
-													<div className="text-sm text-muted-foreground">
-														{user.email}
-													</div>
-												</div>
-											</TableCell>
-											<TableCell>
-												<Badge
-													variant={
-														user.role === "Admin" ? "default" : "secondary"
-													}
-												>
-													{user.role}
-												</Badge>
-											</TableCell>
-											<TableCell>{user.lastActive}</TableCell>
-											<TableCell>{user.documentsProcessed}</TableCell>
-											<TableCell>
-												<Badge
-													variant={
-														user.status === "active" ? "default" : "secondary"
-													}
-												>
-													{user.status}
-												</Badge>
-											</TableCell>
-											<TableCell>
-												<div className="flex items-center space-x-2">
-													<Button variant="ghost" size="sm">
-														<Eye className="h-4 w-4" />
-													</Button>
-													<Button variant="ghost" size="sm">
-														<Edit className="h-4 w-4" />
-													</Button>
-													<Button
-														variant="ghost"
-														size="sm"
-														className="text-destructive hover:text-destructive"
-													>
-														<Trash2 className="h-4 w-4" />
-													</Button>
-												</div>
-											</TableCell>
-										</TableRow>
-									))}
-								</TableBody>
-							</Table>
-						</CardContent>
-					</Card>
-				</TabsContent>
+  useEffect(() => {
+    if (appSettings[customSetting] !== undefined) {
+      setCustomValue(String(appSettings[customSetting]));
+    }
+  }, [appSettings, customSetting]);
 
-				<TabsContent value="usage">
-					<Card>
-						<CardHeader>
-							<CardTitle>Tool Usage Analytics</CardTitle>
-						</CardHeader>
-						<CardContent>
-							<Table>
-								<TableHeader>
-									<TableRow>
-										<TableHead>Tool</TableHead>
-										<TableHead>Active Users</TableHead>
-										<TableHead>Documents Processed</TableHead>
-										<TableHead>Avg. Processing Time</TableHead>
-										<TableHead>User Satisfaction</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{toolUsageStats.map((tool, index) => (
-										<TableRow key={index}>
-											<TableCell className="font-medium">{tool.tool}</TableCell>
-											<TableCell>{tool.users}</TableCell>
-											<TableCell>{tool.documents}</TableCell>
-											<TableCell>{tool.avgTime}</TableCell>
-											<TableCell>
-												<div className="flex items-center space-x-2">
-													<span>{tool.satisfaction}</span>
-													<div className="w-12 bg-gray-200 rounded-full h-2">
-														<div
-															className="bg-green-600 h-2 rounded-full"
-															style={{ width: tool.satisfaction }}
-														></div>
-													</div>
-												</div>
-											</TableCell>
-										</TableRow>
-									))}
-								</TableBody>
-							</Table>
+  const metricTiles = useMemo(
+    () => [
+      {
+        title: "Active Users",
+        value: formatNumber(metrics?.active_users),
+        description: "Currently active across the platform",
+        icon: Users,
+      },
+      {
+        title: "Total Requests",
+        value: formatNumber(metrics?.total_requests),
+        description: "Processed API calls",
+        icon: Activity,
+      },
+      {
+        title: "Uptime (hrs)",
+        value: formatNumber(metrics?.uptime_hours, 1),
+        description: "Cumulative service uptime",
+        icon: Server,
+      },
+      {
+        title: "Disk Usage",
+        value: `${formatNumber(metrics?.disk_usage_percent, 1)}%`,
+        description: "Current storage utilisation",
+        icon: HardDrive,
+      },
+    ],
+    [metrics]
+  );
 
-							<div className="mt-6">
-								<h3 className="font-semibold mb-4">Usage Trends</h3>
-								<div className="h-64 flex items-center justify-center bg-muted/20 rounded border-2 border-dashed">
-									<div className="text-center">
-										<Activity className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
-										<p className="text-muted-foreground">
-											Usage Analytics Chart
-										</p>
-									</div>
-								</div>
-							</div>
-						</CardContent>
-					</Card>
-				</TabsContent>
+  const resourceIndicators = useMemo(
+    () => [
+      {
+        name: "Memory",
+        value: metrics?.memory_usage_percent ?? 0,
+        icon: Gauge,
+      },
+      {
+        name: "CPU",
+        value: metrics?.cpu_usage_percent ?? 0,
+        icon: Cpu,
+      },
+    ],
+    [metrics]
+  );
 
-				<TabsContent value="system">
-					<Card>
-						<CardHeader>
-							<CardTitle>System Health Monitoring</CardTitle>
-						</CardHeader>
-						<CardContent>
-							<Table>
-								<TableHeader>
-									<TableRow>
-										<TableHead>Service</TableHead>
-										<TableHead>Status</TableHead>
-										<TableHead>Uptime</TableHead>
-										<TableHead>Response Time</TableHead>
-										<TableHead>Actions</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{systemHealth.map((service, index) => (
-										<TableRow key={index}>
-											<TableCell className="font-medium">
-												{service.service}
-											</TableCell>
-											<TableCell>
-												<Badge
-													variant={
-														service.status === "healthy"
-															? "default"
-															: service.status === "warning"
-															? "secondary"
-															: "destructive"
-													}
-													className={
-														service.status === "healthy"
-															? "bg-green-100 text-green-800"
-															: service.status === "warning"
-															? "bg-yellow-100 text-yellow-800"
-															: "bg-red-100 text-red-800"
-													}
-												>
-													{service.status}
-												</Badge>
-											</TableCell>
-											<TableCell>{service.uptime}</TableCell>
-											<TableCell>{service.response}</TableCell>
-											<TableCell>
-												<div className="flex items-center space-x-2">
-													<Button variant="ghost" size="sm">
-														<Eye className="h-4 w-4" />
-													</Button>
-													<Button variant="ghost" size="sm">
-														<Settings className="h-4 w-4" />
-													</Button>
-												</div>
-											</TableCell>
-										</TableRow>
-									))}
-								</TableBody>
-							</Table>
+  const handleSettingSubmit = async () => {
+    if (!customSetting) return;
+    try {
+      await updateSettings.mutateAsync({
+        key: customSetting,
+        value: customValue,
+      });
+      toast({
+        title: "Settings updated",
+        description: `${customSetting} saved successfully`,
+      });
+    } catch (error) {
+      toast({
+        title: "Failed to update setting",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive",
+      });
+    }
+  };
 
-							<div className="mt-6 grid gap-4 md:grid-cols-2">
-								<div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-									<h4 className="font-semibold text-green-800 mb-2">
-										System Performance
-									</h4>
-									<p className="text-sm text-green-700">
-										All critical services operating normally. Average response
-										time: 1.2s
-									</p>
-								</div>
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div className="space-y-2">
+          <h1 className="text-3xl font-bold text-foreground flex items-center space-x-2">
+            <Shield className="h-8 w-8 text-primary" />
+            <span>Admin Dashboard</span>
+          </h1>
+          <p className="text-muted-foreground">
+            Monitor platform health, manage users, and adjust runtime settings in real time.
+          </p>
+        </div>
+        <Button variant="outline" onClick={() => window.location.reload()}>
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Refresh Data
+        </Button>
+      </div>
 
-								<div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-									<h4 className="font-semibold text-yellow-800 mb-2">
-										Performance Alert
-									</h4>
-									<p className="text-sm text-yellow-700">
-										AI Analysis Engine showing slower response times. Monitoring
-										in progress.
-									</p>
-								</div>
-							</div>
-						</CardContent>
-					</Card>
-				</TabsContent>
+      {metricsError && (
+        <Alert variant="destructive">
+          <AlertTitle>System metrics unavailable</AlertTitle>
+          <AlertDescription>
+            {(metricsError as Error).message || "The backend did not return metrics."}
+          </AlertDescription>
+        </Alert>
+      )}
 
-				<TabsContent value="activity">
-					<Card>
-						<CardHeader>
-							<CardTitle>Recent User Activity</CardTitle>
-						</CardHeader>
-						<CardContent>
-							<div className="space-y-4">
-								{recentActivity.map((activity, index) => (
-									<div
-										key={index}
-										className="flex items-center justify-between p-4 border rounded-lg"
-									>
-										<div className="flex items-center space-x-4">
-											<Activity className="h-5 w-5 text-primary" />
-											<div>
-												<p className="font-medium">{activity.user}</p>
-												<p className="text-sm text-muted-foreground">
-													{activity.action}
-												</p>
-												<p className="text-xs text-muted-foreground">
-													{activity.timestamp}
-												</p>
-											</div>
-										</div>
-										<Badge variant="outline">{activity.tool}</Badge>
-									</div>
-								))}
-							</div>
+      {metricsLoading && !metricsError && (
+        <p className="text-sm text-muted-foreground">Loading system metrics...</p>
+      )}
 
-							<div className="mt-6">
-								<h3 className="font-semibold mb-4">Activity Heatmap</h3>
-								<div className="h-64 flex items-center justify-center bg-muted/20 rounded border-2 border-dashed">
-									<div className="text-center">
-										<TrendingUp className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
-										<p className="text-muted-foreground">
-											User Activity Heatmap
-										</p>
-									</div>
-								</div>
-							</div>
-						</CardContent>
-					</Card>
-				</TabsContent>
-			</Tabs>
-		</div>
-	);
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {metricTiles.map((metric) => (
+          <Card key={metric.title}>
+            <CardContent className="p-4 flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">{metric.title}</p>
+                <p className="text-2xl font-bold mt-1">{metric.value}</p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  {metric.description}
+                </p>
+              </div>
+              <metric.icon className="h-8 w-8 text-primary" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Cpu className="h-5 w-5" />
+            <span>Resource utilisation</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-2">
+            {resourceIndicators.map((indicator) => (
+              <div key={indicator.name} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2 text-sm font-medium">
+                    <indicator.icon className="h-4 w-4 text-muted-foreground" />
+                    <span>{indicator.name}</span>
+                  </div>
+                  <span className="text-sm text-muted-foreground">
+                    {formatNumber(indicator.value, 1)}%
+                  </span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-muted">
+                  <div
+                    className="h-2 rounded-full bg-primary"
+                    style={{ width: `${Math.min(indicator.value, 100)}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Tabs defaultValue="users" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="users">Users</TabsTrigger>
+          <TabsTrigger value="logs">Logs</TabsTrigger>
+          <TabsTrigger value="settings">Settings</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="users">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Users className="h-5 w-5" />
+                <span>User directory</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {usersError ? (
+                <Alert variant="destructive">
+                  <AlertTitle>Unable to load users</AlertTitle>
+                  <AlertDescription>
+                    {(usersError as Error).message || "The backend did not return user records."}
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>ID</TableHead>
+                        <TableHead>Username</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Created</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {usersLoading ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
+                            Loading users...
+                          </TableCell>
+                        </TableRow>
+                      ) : users.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
+                            No users returned by the API.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        users.map((user) => (
+                          <TableRow key={user.id}>
+                            <TableCell>{user.id}</TableCell>
+                            <TableCell className="font-medium">{user.username}</TableCell>
+                            <TableCell>{user.email}</TableCell>
+                            <TableCell>
+                              <Badge variant={user.role === "admin" ? "default" : "secondary"}>
+                                {user.role}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{formatTimestamp(user.created_at)}</TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="logs">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <ClipboardList className="h-5 w-5" />
+                <span>Recent application logs</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {logsError ? (
+                <Alert variant="destructive">
+                  <AlertTitle>Unable to fetch logs</AlertTitle>
+                  <AlertDescription>
+                    {(logsError as Error).message || "The backend did not return log entries."}
+                  </AlertDescription>
+                </Alert>
+              ) : logsLoading ? (
+                <p className="text-sm text-muted-foreground">Loading logs...</p>
+              ) : logs.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No logs available.</p>
+              ) : (
+                <div className="space-y-3">
+                  {logs.map((log, index) => (
+                    <div key={`${log.timestamp}-${index}`} className="border rounded-lg p-4">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium">{log.level}</span>
+                        <span className="text-muted-foreground">
+                          {formatTimestamp(log.timestamp)}
+                        </span>
+                      </div>
+                      <p className="text-sm mt-2">{log.message}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Source: {log.source}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="settings">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Settings className="h-5 w-5" />
+                <span>Runtime settings</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                  Current values
+                </h3>
+                {settingsLoading ? (
+                  <p className="text-sm text-muted-foreground">Loading settings...</p>
+                ) : Object.keys(appSettings).length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No settings returned by the API.</p>
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {Object.entries(appSettings).map(([key, value]) => (
+                      <div key={key} className="border rounded-lg p-4">
+                        <p className="text-xs uppercase text-muted-foreground">{key}</p>
+                        <p className="text-sm font-medium">{String(value)}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="border rounded-lg p-4 space-y-3">
+                <h3 className="text-sm font-semibold">Update setting</h3>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground" htmlFor="setting-key">
+                      Setting key
+                    </label>
+                    <Input
+                      id="setting-key"
+                      value={customSetting}
+                      onChange={(event) => setCustomSetting(event.target.value)}
+                      placeholder="e.g. log_level"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground" htmlFor="setting-value">
+                      New value
+                    </label>
+                    <Input
+                      id="setting-value"
+                      value={customValue}
+                      onChange={(event) => setCustomValue(event.target.value)}
+                      placeholder="Enter value"
+                    />
+                  </div>
+                </div>
+                <Button
+                  onClick={handleSettingSubmit}
+                  disabled={updateSettings.isPending || !customSetting}
+                >
+                  <Send className="h-4 w-4 mr-2" />
+                  {updateSettings.isPending ? "Saving..." : "Save setting"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
 }

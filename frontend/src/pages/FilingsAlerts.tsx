@@ -1,446 +1,368 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { 
-  Bell, 
-  Plus, 
-  Search, 
+import { useMemo, useState, type FormEvent } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Bell,
+  Globe,
+  RefreshCw,
   ExternalLink,
-  Calendar,
-  FileText,
-  Trash2,
-  Settings,
-  Clock
-} from "lucide-react"
 
-const watchlistCompanies = [
-  {
-    id: 1,
-    symbol: "AAPL",
-    name: "Apple Inc.",
-    sector: "Technology",
-    dateAdded: "2025-07-01",
-    lastFiling: "10-K",
-    filingDate: "2025-07-20",
-    alertsCount: 3
-  },
-  {
-    id: 2,
-    symbol: "MSFT",
-    name: "Microsoft Corporation",
-    sector: "Technology",
-    dateAdded: "2025-06-15",
-    lastFiling: "8-K",
-    filingDate: "2025-07-18",
-    alertsCount: 2
-  },
-  {
-    id: 3,
-    symbol: "GOOGL",
-    name: "Alphabet Inc.",
-    sector: "Communication Services",
-    dateAdded: "2025-06-20",
-    lastFiling: "10-Q",
-    filingDate: "2025-07-15",
-    alertsCount: 4
-  },
-  {
-    id: 4,
-    symbol: "TSLA",
-    name: "Tesla, Inc.",
-    sector: "Consumer Discretionary",
-    dateAdded: "2025-07-05",
-    lastFiling: "8-K",
-    filingDate: "2025-07-22",
-    alertsCount: 1
-  },
-  {
-    id: 5,
-    symbol: "AMZN",
-    name: "Amazon.com Inc.",
-    sector: "Consumer Discretionary",
-    dateAdded: "2025-05-30",
-    lastFiling: "10-Q",
-    filingDate: "2025-07-12",
-    alertsCount: 5
+  Send,
+  Mail,
+  Loader2,
+  AlertCircle,
+} from "lucide-react";
+import {
+  useIndiaFilings,
+  useUSFilings,
+  useEmailIndiaFilings,
+  useEmailUSFilings,
+} from "@/hooks/useApi";
+import { useToast } from "@/hooks/use-toast";
+
+const DEFAULT_COUNT = 10;
+
+type EmailFormState = {
+  to: string;
+  cc: string;
+};
+
+type FilingRecord = {
+  title?: string;
+  link?: string;
+  company?: string;
+  date?: string;
+  [key: string]: unknown;
+};
+
+function normaliseTitle(filing: FilingRecord): string {
+  return filing.title || filing.company || "Untitled filing";
+}
+
+function normaliseDate(filing: FilingRecord): string | undefined {
+  if (!filing.date) {
+    return undefined;
   }
-]
-
-const recentAlerts = [
-  {
-    id: 1,
-    company: "Apple Inc.",
-    symbol: "AAPL",
-    filingType: "10-K",
-    filingDate: "2025-07-22",
-    alertTime: "2 hours ago",
-    description: "Annual Report filed with SEC",
-    priority: "high",
-    read: false
-  },
-  {
-    id: 2,
-    company: "Tesla, Inc.",
-    symbol: "TSLA",
-    filingType: "8-K",
-    filingDate: "2025-07-22",
-    alertTime: "4 hours ago",
-    description: "Current Report - Material Agreement",
-    priority: "medium",
-    read: false
-  },
-  {
-    id: 3,
-    company: "Microsoft Corporation",
-    symbol: "MSFT",
-    filingType: "DEF 14A",
-    filingDate: "2025-07-21",
-    alertTime: "1 day ago",
-    description: "Proxy Statement filed",
-    priority: "low",
-    read: true
-  },
-  {
-    id: 4,
-    company: "Alphabet Inc.",
-    symbol: "GOOGL",
-    filingType: "10-Q",
-    filingDate: "2025-07-20",
-    alertTime: "2 days ago",
-    description: "Quarterly Report filed",
-    priority: "high",
-    read: true
-  },
-  {
-    id: 5,
-    company: "Amazon.com Inc.",
-    symbol: "AMZN",
-    filingType: "8-K",
-    filingDate: "2025-07-19",
-    alertTime: "3 days ago",
-    description: "Current Report - Executive Changes",
-    priority: "medium",
-    read: true
+  try {
+    const parsed = new Date(filing.date);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toLocaleDateString();
+    }
+  } catch (error) {
+    return filing.date;
   }
-]
-
-const filingTypes = [
-  { type: "10-K", description: "Annual Report", count: 12 },
-  { type: "10-Q", description: "Quarterly Report", count: 24 },
-  { type: "8-K", description: "Current Report", count: 45 },
-  { type: "DEF 14A", description: "Proxy Statement", count: 8 },
-  { type: "13F", description: "Holdings Report", count: 6 },
-  { type: "SC 13G", description: "Beneficial Ownership", count: 3 }
-]
-
-const alertSettings = [
-  { type: "Email Notifications", enabled: true, description: "Receive email alerts for new filings" },
-  { type: "In-App Notifications", enabled: true, description: "Show notifications within the platform" },
-  { type: "Priority Filtering", enabled: false, description: "Only show high-priority filings" },
-  { type: "After Hours Alerts", enabled: true, description: "Send alerts outside business hours" }
-]
+  return filing.date;
+}
 
 export default function FilingsAlerts() {
+  const { toast } = useToast();
+  const [activeRegion, setActiveRegion] = useState<"us" | "india">("us");
+  const [emailForm, setEmailForm] = useState<EmailFormState>({ to: "", cc: "" });
+
+  const usQuery = useUSFilings(DEFAULT_COUNT);
+  const indiaQuery = useIndiaFilings(DEFAULT_COUNT);
+  const sendUsFilings = useEmailUSFilings();
+  const sendIndiaFilings = useEmailIndiaFilings();
+
+  const statsCards = useMemo(
+    () => [
+      {
+        title: "US SEC filings",
+        value: usQuery.isLoading ? "--" : String(usQuery.data?.count ?? 0),
+        description: "Latest entries pulled from the SEC Atom feed",
+        icon: Globe,
+      },
+      {
+        title: "India SEBI filings",
+        value: indiaQuery.isLoading ? "--" : String(indiaQuery.data?.count ?? 0),
+        description: "Most recent disclosures from SEBI",
+        icon: Bell,
+      },
+    ],
+    [indiaQuery.data?.count, indiaQuery.isLoading, usQuery.data?.count, usQuery.isLoading]
+  );
+
+  const filings: FilingRecord[] = useMemo(() => {
+    if (activeRegion === "us") {
+      return (usQuery.data?.results as FilingRecord[] | undefined) ?? [];
+    }
+    return (indiaQuery.data?.results as FilingRecord[] | undefined) ?? [];
+  }, [activeRegion, indiaQuery.data?.results, usQuery.data?.results]);
+
+  const activeQuery = activeRegion === "us" ? usQuery : indiaQuery;
+  const isSendingEmail = sendUsFilings.isPending || sendIndiaFilings.isPending;
+
+  const handleRefresh = () => {
+    void activeQuery.refetch();
+  };
+
+  const handleEmailSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!emailForm.to.trim()) {
+      toast({
+        title: "Recipient email required",
+        description: "Add an email address before sending the digest.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const ccList = emailForm.cc
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0);
+
+    try {
+      if (activeRegion === "us") {
+        await sendUsFilings.mutateAsync({
+          to: emailForm.to.trim(),
+          cc: ccList.length ? ccList : undefined,
+        });
+      } else {
+        await sendIndiaFilings.mutateAsync({
+          to: emailForm.to.trim(),
+          cc: ccList.length ? ccList : undefined,
+        });
+      }
+
+      toast({
+        title: "Digest sent",
+        description: `Shared ${activeRegion.toUpperCase()} filings with ${emailForm.to.trim()}.`,
+      });
+      setEmailForm({ to: "", cc: "" });
+    } catch (error) {
+      toast({
+        title: "Failed to send digest",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const renderStateMessage = (region: "us" | "india") => {
+    if (activeRegion !== region) {
+      return null;
+    }
+
+    const query = region === "us" ? usQuery : indiaQuery;
+    const regionFilings = filings;
+
+    if (query.isLoading) {
+      return <p className="text-sm text-muted-foreground">Loading filings...</p>;
+    }
+    if (query.error) {
+      return (
+        <Alert variant="destructive">
+          <AlertTitle>Unable to fetch filings</AlertTitle>
+          <AlertDescription>
+            {(query.error as Error).message || "The backend did not return filings."}
+          </AlertDescription>
+        </Alert>
+      );
+    }
+    if (regionFilings.length === 0) {
+      return <p className="text-sm text-muted-foreground">No filings available for this region.</p>;
+    }
+    return null;
+  };
+
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="space-y-2">
-        <h1 className="text-3xl font-bold text-foreground">Corporate Filings Alerts</h1>
+        <h1 className="text-3xl font-bold text-foreground">Corporate filings alerts</h1>
         <p className="text-muted-foreground">
-          Monitor SEC filings and get real-time notifications for companies on your watchlist.
+          Track regulatory disclosures from US and India markets, refresh data on demand, and email curated digests to your team.
         </p>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
+      <div className="grid gap-4 md:grid-cols-2">
+        {statsCards.map((card) => (
+          <Card key={card.title}>
+            <CardContent className="p-4 flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Companies Watched</p>
-                <p className="text-2xl font-bold">{watchlistCompanies.length}</p>
+                <p className="text-sm text-muted-foreground">{card.title}</p>
+                <p className="text-2xl font-bold mt-2">{card.value}</p>
+                <p className="text-xs text-muted-foreground mt-2">{card.description}</p>
               </div>
-              <Bell className="h-8 w-8 text-blue-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">New Alerts Today</p>
-                <p className="text-2xl font-bold">8</p>
-              </div>
-              <Clock className="h-8 w-8 text-orange-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Filings</p>
-                <p className="text-2xl font-bold">98</p>
-              </div>
-              <FileText className="h-8 w-8 text-green-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Unread Alerts</p>
-                <p className="text-2xl font-bold">3</p>
-              </div>
-              <Badge className="bg-accent text-accent-foreground">New</Badge>
-            </div>
-          </CardContent>
-        </Card>
+              <card.icon className="h-8 w-8 text-primary" />
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
-      <Tabs defaultValue="alerts" className="space-y-4">
+      <Tabs value={activeRegion} onValueChange={(value) => setActiveRegion(value as "us" | "india")}>
         <TabsList>
-          <TabsTrigger value="alerts">Recent Alerts</TabsTrigger>
-          <TabsTrigger value="watchlist">Watchlist</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
+          <TabsTrigger value="us">US Filings</TabsTrigger>
+          <TabsTrigger value="india">India Filings</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="alerts">
+        <TabsContent value="us" className="space-y-4">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
               <CardTitle className="flex items-center space-x-2">
-                <Bell className="h-5 w-5" />
-                <span>Recent Filing Alerts</span>
+                <Globe className="h-5 w-5" />
+                <span>SEC recent filings</span>
               </CardTitle>
+              <Button variant="outline" onClick={handleRefresh} disabled={activeQuery.isLoading}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh feed
+              </Button>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {recentAlerts.map((alert) => (
-                  <div key={alert.id} className={`p-4 border rounded-lg ${
-                    !alert.read ? 'bg-blue-50 border-blue-200' : 'bg-card'
-                  }`}>
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start space-x-4">
-                        <FileText className="h-5 w-5 text-primary mt-1" />
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-2 mb-1">
-                            <h3 className="font-semibold">{alert.company} ({alert.symbol})</h3>
-                            {!alert.read && <Badge variant="destructive" className="text-xs">New</Badge>}
-                          </div>
-                          <p className="text-sm text-muted-foreground mb-1">{alert.description}</p>
-                          <div className="flex items-center space-x-4 text-xs text-muted-foreground">
-                            <span>Filing: {alert.filingType}</span>
-                            <span>Date: {alert.filingDate}</span>
-                            <span>{alert.alertTime}</span>
-                          </div>
-                        </div>
+            <CardContent className="space-y-4">
+              {renderStateMessage("us")}
+              {activeRegion === "us" && filings.length > 0 && (
+                <div className="space-y-3">
+                  {filings.map((filing, index) => (
+                    <div
+                      key={`${filing.link ?? filing.title ?? index}-${index}`}
+                      className="border rounded-lg p-4 flex items-start justify-between gap-4"
+                    >
+                      <div>
+                        <p className="font-medium text-sm">{normaliseTitle(filing)}</p>
+                        {filing.link && (
+                          <p className="text-xs text-muted-foreground break-all mt-1">{filing.link}</p>
+                        )}
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge variant={
-                          alert.priority === 'high' ? 'destructive' :
-                          alert.priority === 'medium' ? 'default' : 'secondary'
-                        }>
-                          {alert.priority}
-                        </Badge>
-                        <Button variant="outline" size="sm">
-                          <ExternalLink className="h-4 w-4 mr-1" />
-                          View Filing
+                      {filing.link && (
+                        <Button variant="outline" size="sm" asChild>
+                          <a href={filing.link} target="_blank" rel="noreferrer">
+                            <ExternalLink className="h-4 w-4 mr-1" />
+                            View
+                          </a>
                         </Button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="watchlist">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Company Watchlist</CardTitle>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Company
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {/* Search */}
-              <div className="mb-6">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input placeholder="Search companies..." className="pl-9" />
-                </div>
-              </div>
-
-              {/* Watchlist Table */}
-              <div className="space-y-4">
-                {watchlistCompanies.map((company) => (
-                  <div key={company.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center space-x-4">
-                      <div className="flex items-center justify-center w-10 h-10 bg-primary/10 text-primary font-bold rounded-lg">
-                        {company.symbol.slice(0, 2)}
-                      </div>
-                      <div>
-                        <h3 className="font-semibold">{company.name} ({company.symbol})</h3>
-                        <p className="text-sm text-muted-foreground">{company.sector}</p>
-                        <div className="flex items-center space-x-4 text-xs text-muted-foreground mt-1">
-                          <span>Added: {company.dateAdded}</span>
-                          <span>Last Filing: {company.lastFiling} ({company.filingDate})</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <div className="text-center">
-                        <Badge variant="secondary">{company.alertsCount}</Badge>
-                        <p className="text-xs text-muted-foreground mt-1">Alerts</p>
-                      </div>
-                      <Button variant="ghost" size="sm">
-                        <Settings className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="analytics">
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Filing Types Distribution</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {filingTypes.map((filing, index) => (
-                    <div key={index} className="flex items-center justify-between">
-                      <div>
-                        <span className="font-medium">{filing.type}</span>
-                        <p className="text-sm text-muted-foreground">{filing.description}</p>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge variant="secondary">{filing.count}</Badge>
-                        <div className="w-20 bg-gray-200 rounded-full h-2">
-                          <div 
-                            className="bg-primary h-2 rounded-full" 
-                            style={{ width: `${(filing.count / 50) * 100}%` }}
-                          ></div>
-                        </div>
-                      </div>
+                      )}
                     </div>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Weekly Activity</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Monday</span>
-                    <span className="font-medium">12 filings</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Tuesday</span>
-                    <span className="font-medium">8 filings</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Wednesday</span>
-                    <span className="font-medium">15 filings</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Thursday</span>
-                    <span className="font-medium">6 filings</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Friday</span>
-                    <span className="font-medium">4 filings</span>
-                  </div>
-                  
-                  <div className="pt-4 border-t">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Total This Week</span>
-                      <span className="text-lg font-bold">45 filings</span>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle>Activity Timeline</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-64 flex items-center justify-center bg-muted/20 rounded border-2 border-dashed">
-                <div className="text-center">
-                  <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-muted-foreground">Filing Activity Chart</p>
-                </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="settings">
+        <TabsContent value="india" className="space-y-4">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
               <CardTitle className="flex items-center space-x-2">
-                <Settings className="h-5 w-5" />
-                <span>Alert Settings</span>
+                <Bell className="h-5 w-5" />
+                <span>SEBI recent filings</span>
               </CardTitle>
+              <Button variant="outline" onClick={handleRefresh} disabled={activeQuery.isLoading}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh feed
+              </Button>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                {alertSettings.map((setting, index) => (
-                  <div key={index} className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-medium">{setting.type}</h3>
-                      <p className="text-sm text-muted-foreground">{setting.description}</p>
-                    </div>
-                    <Button variant={setting.enabled ? "default" : "outline"} size="sm">
-                      {setting.enabled ? "Enabled" : "Disabled"}
-                    </Button>
-                  </div>
-                ))}
-                
-                <div className="pt-6 border-t">
-                  <h3 className="font-medium mb-4">Filing Type Preferences</h3>
-                  <div className="grid gap-3 md:grid-cols-2">
-                    {filingTypes.map((filing, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 bg-muted/20 rounded-lg">
-                        <div>
-                          <span className="font-medium">{filing.type}</span>
-                          <p className="text-xs text-muted-foreground">{filing.description}</p>
-                        </div>
-                        <input type="checkbox" defaultChecked className="h-4 w-4" />
+            <CardContent className="space-y-4">
+              {renderStateMessage("india")}
+              {activeRegion === "india" && filings.length > 0 && (
+                <div className="space-y-3">
+                  {filings.map((filing, index) => (
+                    <div
+                      key={`${filing.link ?? filing.title ?? index}-${index}`}
+                      className="border rounded-lg p-4 flex items-start justify-between gap-4"
+                    >
+                      <div className="space-y-1">
+                        <p className="font-medium text-sm">{normaliseTitle(filing)}</p>
+                        {normaliseDate(filing) && (
+                          <p className="text-xs text-muted-foreground">Filed: {normaliseDate(filing)}</p>
+                        )}
+                        {filing.company && (
+                          <Badge variant="secondary" className="w-fit text-xs">
+                            {filing.company}
+                          </Badge>
+                        )}
                       </div>
-                    ))}
-                  </div>
+                      {filing.link && (
+                        <Button variant="outline" size="sm" asChild>
+                          <a href={filing.link} target="_blank" rel="noreferrer">
+                            <ExternalLink className="h-4 w-4 mr-1" />
+                            View
+                          </a>
+                        </Button>
+                      )}
+                    </div>
+                  ))}
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Mail className="h-5 w-5" />
+            <span>Send filings digest</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form className="grid gap-4 md:grid-cols-3" onSubmit={handleEmailSubmit}>
+            <div className="md:col-span-1">
+              <label htmlFor="email-recipient" className="text-sm font-medium">
+                Recipient email
+              </label>
+              <Input
+                id="email-recipient"
+                type="email"
+                placeholder="analyst@example.com"
+                value={emailForm.to}
+                onChange={(event) => setEmailForm((prev) => ({ ...prev, to: event.target.value }))}
+                required
+              />
+            </div>
+            <div className="md:col-span-1">
+              <label htmlFor="email-cc" className="text-sm font-medium">
+                CC (comma separated)
+              </label>
+              <Input
+                id="email-cc"
+                placeholder="team@example.com"
+                value={emailForm.cc}
+                onChange={(event) => setEmailForm((prev) => ({ ...prev, cc: event.target.value }))}
+              />
+            </div>
+            <div className="md:col-span-1 flex items-end">
+              <Button type="submit" className="w-full" disabled={isSendingEmail}>
+                {isSendingEmail ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4 mr-2" />
+                )}
+                {isSendingEmail ? "Sending..." : `Send ${activeRegion.toUpperCase()} digest`}
+              </Button>
+            </div>
+          </form>
+          <p className="text-xs text-muted-foreground mt-2">
+            The digest uses the latest filings returned by the {activeRegion.toUpperCase()} endpoint.
+          </p>
+        </CardContent>
+      </Card>
+
+      {(sendUsFilings.error || sendIndiaFilings.error) && (
+        <Alert variant="destructive">
+          <AlertTitle>Email delivery failed</AlertTitle>
+          <AlertDescription>
+            {((sendUsFilings.error || sendIndiaFilings.error) as Error).message ||
+              "An error occurred while sending filings via email."}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {activeQuery.error && !activeQuery.isLoading && (
+        <Alert variant="destructive" className="flex items-start gap-2">
+          <AlertCircle className="h-4 w-4 mt-0.5" />
+          <div>
+            <AlertTitle>Realtime feed encountered an error</AlertTitle>
+            <AlertDescription>
+              {(activeQuery.error as Error).message || "No additional details were provided."}
+            </AlertDescription>
+          </div>
+        </Alert>
+      )}
     </div>
-  )
+  );
 }

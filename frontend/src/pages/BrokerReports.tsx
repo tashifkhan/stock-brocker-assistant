@@ -406,26 +406,6 @@ export default function BrokerReports() {
 									</div>
 								</div>
 								<div className="flex items-center space-x-4">
-									<Badge
-										variant={
-											report.sentiment === "positive"
-												? "default"
-												: report.sentiment === "negative"
-												? "destructive"
-												: "secondary"
-										}
-									>
-										{report.sentiment === "positive" && (
-											<TrendingUp className="h-3 w-3 mr-1" />
-										)}
-										{report.sentiment === "negative" && (
-											<TrendingDown className="h-3 w-3 mr-1" />
-										)}
-										{report.sentiment === "neutral" && (
-											<Minus className="h-3 w-3 mr-1" />
-										)}
-										{report.sentiment}
-									</Badge>
 									{report.status === "generated" ? (
 										<Badge className="bg-success text-success-foreground">
 											<CheckCircle className="h-3 w-3 mr-1" />
@@ -511,7 +491,7 @@ export default function BrokerReports() {
 													China Regulatory Challenges
 												</p>
 												<p className="text-xs text-muted-foreground">
-													AI feature rollout facing regulatory hurdles in China,
+													AI features facing regulatory hurdles in China,
 													potentially impacting 18% market share in the region
 													with medium-term implications for Q4 2025.
 												</p>

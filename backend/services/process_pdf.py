@@ -47,7 +47,7 @@ def convert_pdf_to_md(pdf_path: str, images_dir: Optional[str] = None, include_i
     Returns:
         Markdown text as a single string.
     """
-    doc = fitz.open(pdf_path)
+    doc = fitz.open(pdf_path) # type: ignore
 
     # Gather font sizes to build heading heuristics
     sizes = {}

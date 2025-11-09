@@ -12,8 +12,13 @@ import {
 	DollarSign,
 	Users,
 	FileBarChart,
+	Loader,
+	AlertCircle,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useMarketSummaryDaily, useScrapeArticles } from "@/hooks/useApi";
+import { Skeleton } from "@/components/ui/skeleton";
+import type { Article } from "@/lib/api";
 
 const quickAccessCards = [
 	{
@@ -120,6 +125,40 @@ const keyMetrics = [
 
 export default function Dashboard() {
 	const navigate = useNavigate();
+	const { data: marketSummary, isLoading: marketLoading, error: marketError } = useMarketSummaryDaily();
+	const {
+		data: articlesData,
+		isLoading: articlesLoading,
+		error: articlesError,
+	} = useScrapeArticles({ count: 5, maxArticles: 12 });
+
+	const recentArticles = (articlesData?.articles ?? []).slice(0, 3) as Article[];
+
+	const formatArticleSource = (link?: string) => {
+		if (!link) return "Unknown source";
+		try {
+			const host = new URL(link).hostname.replace(/^www\./, "");
+			return host || "Unknown source";
+		} catch (error) {
+			return link;
+		}
+	};
+
+	const formatArticleDate = (value?: string | null) => {
+		if (!value) return "";
+		const parsed = new Date(value);
+		if (Number.isNaN(parsed.getTime())) {
+			return value;
+		}
+		return parsed.toLocaleDateString(undefined, {
+			month: "short",
+			day: "numeric",
+		});
+	};
+
+	// Transform market data for display
+	const topGainers = marketSummary?.top_gainers?.slice(0, 3) || [];
+	const topLosers = marketSummary?.top_losers?.slice(0, 2) || [];
 
 	return (
 		<div className="space-y-6">
@@ -181,6 +220,107 @@ export default function Dashboard() {
 						</Card>
 					))}
 				</div>
+			</div>
+
+			{/* Market Data and Articles */}
+			<div className="grid gap-6 lg:grid-cols-2">
+				{/* Market Summary */}
+				<Card>
+					<CardHeader>
+						<CardTitle className="flex items-center space-x-2">
+							<TrendingUp className="h-5 w-5" />
+							<span>Market Overview</span>
+						</CardTitle>
+					</CardHeader>
+					<CardContent>
+						{marketLoading ? (
+							<div className="space-y-4">
+								<Skeleton className="h-4 w-full" />
+								<Skeleton className="h-4 w-3/4" />
+							</div>
+						) : marketError ? (
+							<div className="flex items-center space-x-2 text-red-600 text-sm">
+								<AlertCircle className="h-4 w-4" />
+								<span>Failed to load market data</span>
+							</div>
+						) : (
+							<div className="space-y-4">
+								<div>
+									<p className="text-xs text-muted-foreground mb-2">Top Gainers</p>
+									<div className="space-y-2">
+										{topGainers.map((gainer: any) => (
+											<div key={gainer.symbol} className="flex justify-between items-center">
+												<span className="text-sm font-medium">{gainer.symbol}</span>
+												<Badge className="bg-green-100 text-green-800">
+													+{gainer.change_percent.toFixed(2)}%
+												</Badge>
+											</div>
+										))}
+									</div>
+								</div>
+								<div className="pt-2 border-t">
+									<p className="text-xs text-muted-foreground mb-2">Top Losers</p>
+									<div className="space-y-2">
+										{topLosers.map((loser: any) => (
+											<div key={loser.symbol} className="flex justify-between items-center">
+												<span className="text-sm font-medium">{loser.symbol}</span>
+												<Badge className="bg-red-100 text-red-800">
+													{loser.change_percent.toFixed(2)}%
+												</Badge>
+											</div>
+										))}
+									</div>
+								</div>
+							</div>
+						)}
+						<Button variant="outline" className="w-full mt-4">
+							View Full Market Data
+						</Button>
+					</CardContent>
+				</Card>
+
+				{/* Recent Articles */}
+				<Card>
+					<CardHeader>
+						<CardTitle className="flex items-center space-x-2">
+							<FileText className="h-5 w-5" />
+							<span>Recent Articles</span>
+						</CardTitle>
+					</CardHeader>
+					<CardContent>
+						{articlesLoading ? (
+							<div className="space-y-4">
+								<Skeleton className="h-4 w-full" />
+								<Skeleton className="h-4 w-full" />
+							</div>
+						) : articlesError ? (
+							<div className="flex items-center space-x-2 text-red-600 text-sm">
+								<AlertCircle className="h-4 w-4" />
+								<span>Failed to load articles</span>
+							</div>
+						) : (
+							<div className="space-y-3">
+								{recentArticles.map((article, index) => {
+									const articleDate = formatArticleDate(article.publish_date);
+									return (
+										<div key={`${article.link}-${index}`} className="border-b pb-3 last:border-b-0">
+											<p className="text-sm font-medium line-clamp-2">
+												{article.title || "Untitled article"}
+											</p>
+											<div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
+												<span>{formatArticleSource(article.link)}</span>
+												{articleDate && <span>{articleDate}</span>}
+											</div>
+										</div>
+									);
+								})}
+							</div>
+						)}
+						<Button variant="outline" className="w-full mt-4" onClick={() => navigate("/broker-reports")}>
+							View All Articles
+						</Button>
+					</CardContent>
+				</Card>
 			</div>
 
 			{/* Recent Activity */}
