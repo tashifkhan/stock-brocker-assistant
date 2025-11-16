@@ -116,6 +116,15 @@ export function useScrapeArticles({
   });
 }
 
+export function useSavedArticles(limit: number = 50, skip: number = 0) {
+  return useQuery({
+    queryKey: ["articles", "saved", limit, skip],
+    queryFn: () => articlesApi.getSaved(limit, skip),
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    gcTime: 30 * 60 * 1000,
+  });
+}
+
 // ============ EDITORIAL HOOKS ============
 
 export function useEditorialSuggestions(

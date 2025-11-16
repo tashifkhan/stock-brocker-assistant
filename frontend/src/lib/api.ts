@@ -82,14 +82,19 @@ export interface StyleGuide {
 
 // Article Types
 export interface Article {
+  _id?: string;
   link: string;
   title: string;
-  text: string;
-  author: string[];
-  publish_date: string | null;
+  text?: string | null;
+  authors?: string[];
+  author?: string[]; // Keep for backwards compatibility
+  publish_date?: string | null;
   keywords?: string[];
   tags?: string[];
-  thumbnail?: string;
+  thumbnail?: string | null;
+  source?: string | null;
+  created_at?: string;
+  updated_at?: string;
   [key: string]: any;
 }
 
@@ -237,6 +242,12 @@ export const articlesApi = {
     }
     return apiCall<ScrapeArticlesResponse>(
       `/articles/scrape?${params.toString()}`
+    );
+  },
+
+  getSaved: (limit: number = 50, skip: number = 0) => {
+    return apiCall<Article[]>(
+      `/articles/saved?limit=${limit}&skip=${skip}`
     );
   },
 };

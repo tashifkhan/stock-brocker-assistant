@@ -1,10 +1,13 @@
+import { useMemo, useState } from "react";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { useScrapeArticles, useSavedArticles } from "@/hooks/useApi";
 import {
-	Upload,
 	FileText,
 	Download,
 	Save,
@@ -20,6 +23,7 @@ import {
 	ExternalLink,
 	AlertCircle,
 	RefreshCw,
+ 	Loader2,
 } from "lucide-react";
 
 const dataSourcesConfig = [
@@ -70,69 +74,6 @@ const dataSourcesConfig = [
 	},
 ];
 
-const extractedReports = [
-	{
-		id: 1,
-		company: "Apple Inc. (AAPL)",
-		source: "Yahoo Finance",
-		title: "Apple Reports Strong Q3 Earnings, Services Revenue Jumps 15%",
-		extractedAt: "2 hours ago",
-		sentiment: "positive",
-		keyMetrics: {
-			revenue: "$81.8B",
-			eps: "$1.26",
-			guidance: "Optimistic",
-		},
-		url: "https://finance.yahoo.com/news/apple-earnings-q3-2025",
-		status: "processed",
-	},
-	{
-		id: 2,
-		company: "Apple Inc. (AAPL)",
-		source: "Bloomberg",
-		title: "Apple's AI Push Faces China Regulatory Hurdles",
-		extractedAt: "3 hours ago",
-		sentiment: "negative",
-		keyMetrics: {
-			marketShare: "18% (China)",
-			impact: "Medium",
-			timeline: "Q4 2025",
-		},
-		url: "https://bloomberg.com/news/apple-china-ai-regulation",
-		status: "processed",
-	},
-	{
-		id: 3,
-		company: "Apple Inc. (AAPL)",
-		source: "SEC EDGAR",
-		title: "Form 10-Q: Quarterly Report - Q3 2025",
-		extractedAt: "1 hour ago",
-		sentiment: "neutral",
-		keyMetrics: {
-			cashPosition: "$162.1B",
-			debt: "$104.5B",
-			capex: "$7.2B",
-		},
-		url: "https://sec.gov/edgar/data/320193/000032019325000087",
-		status: "processed",
-	},
-	{
-		id: 4,
-		company: "Apple Inc. (AAPL)",
-		source: "MarketWatch",
-		title: "Analyst Upgrades Apple on Strong iPhone 16 Pre-Orders",
-		extractedAt: "4 hours ago",
-		sentiment: "positive",
-		keyMetrics: {
-			preOrders: "+25% YoY",
-			priceTarget: "$210",
-			rating: "Buy",
-		},
-		url: "https://marketwatch.com/story/apple-iphone-16-preorders",
-		status: "processed",
-	},
-];
-
 const synthesizedReports = [
 	{
 		id: 1,
@@ -164,7 +105,307 @@ const synthesizedReports = [
 	},
 ];
 
+type PreparedArticle = {
+	id: string;
+	title: string;
+	source: string;
+	company: string;
+	extractedAt: string;
+	publishedAt: Date | null;
+	sentiment: "positive" | "neutral" | "negative";
+	status: string;
+	url: string;
+	summary: string;
+	keyMetrics: Record<string, string>;
+	keywords: string[];
+	tags: string[];
+	authors: string[];
+	wordCount: number;
+};
+
+const SOURCE_LOOKUP: Array<{ match: string; label: string; color: string }> = [
+	{ match: "sec", label: "Regulatory", color: "bg-blue-500" },
+	{ match: "bloomberg", label: "Premium", color: "bg-orange-500" },
+	{ match: "reuters", label: "Wire", color: "bg-emerald-500" },
+	{ match: "marketwatch", label: "Market", color: "bg-green-500" },
+	{ match: "livemint", label: "Regional", color: "bg-amber-500" },
+	{ match: "yahoo", label: "Public", color: "bg-purple-500" },
+];
+
+const DEFAULT_SOURCE_META = { label: "External", color: "bg-slate-400" };
+
+function parseWebsiteInput(input: string): string[] {
+	return input
+		.split(/[\n,]+/)
+		.map((value) => value.trim())
+		.filter(Boolean);
+}
+
+function deriveSource(rawSource?: string | null, link?: string): string {
+	if (rawSource && rawSource.trim().length > 0) {
+		return rawSource.trim();
+	}
+	if (!link) {
+		return "Unknown source";
+	}
+	try {
+		const hostname = new URL(link).hostname.replace(/^www\./, "");
+		return hostname || "Unknown source";
+	} catch {
+		return "Unknown source";
+	}
+}
+
+function parsePublishDate(value?: string | null): { formatted: string; date: Date | null } {
+	if (!value) {
+		return { formatted: "Unknown publish date", date: null };
+	}
+	const parsed = new Date(value);
+	if (Number.isNaN(parsed.getTime())) {
+		return { formatted: value, date: null };
+	}
+	return { formatted: parsed.toLocaleString(), date: parsed };
+}
+
+function buildSummary(text?: string | null, maxLength: number = 220): string {
+	if (!text) {
+		return "No summary available.";
+	}
+	const cleaned = text.replace(/\s+/g, " ").trim();
+	if (cleaned.length <= maxLength) {
+		return cleaned;
+	}
+	return `${cleaned.slice(0, maxLength - 3)}...`;
+}
+
+function getSourceMeta(source: string) {
+	const match = SOURCE_LOOKUP.find((entry) =>
+		source.toLowerCase().includes(entry.match)
+	);
+	return match ? { label: match.label, color: match.color } : DEFAULT_SOURCE_META;
+}
+
 export default function BrokerReports() {
+	const [searchQuery, setSearchQuery] = useState("");
+	const [countInput, setCountInput] = useState("5");
+	const [maxArticlesInput, setMaxArticlesInput] = useState("60");
+	const [websiteInput, setWebsiteInput] = useState("");
+	const [scrapeParams, setScrapeParams] = useState({
+		count: 5,
+		maxArticles: 60,
+		websites: [] as string[],
+	});
+
+	const savedArticlesQuery = useSavedArticles(200, 0);
+	const scrapeQuery = useScrapeArticles({ ...scrapeParams, enabled: false });
+	const { data: savedData, isLoading: savedLoading, isPending: savedPending, isFetching: savedFetching, isError: savedError, error: savedErrorObj, refetch: refetchSaved } = savedArticlesQuery;
+	const { data: scrapeData, isLoading: scrapeLoading, isPending: scrapePending, isFetching: scrapeFetching, isError: scrapeError, error: scrapeErrorObj, refetch: refetchScrape } = scrapeQuery;
+
+	// Use saved articles if available, otherwise use scraped articles
+	// savedData is already an array, scrapeData.articles is also an array
+	const articles = (savedData && Array.isArray(savedData) ? savedData : scrapeData?.articles) ?? [];
+	const isLoading = savedLoading || scrapeLoading;
+	const isPending = savedPending || scrapePending;
+	const isFetching = savedFetching || scrapeFetching;
+	const isError = savedError || scrapeError;
+	const error = savedErrorObj || scrapeErrorObj;
+	const refetch = refetchSaved;
+
+	const filteredArticles = useMemo(() => {
+		const term = searchQuery.trim().toLowerCase();
+		if (!term) {
+			return articles;
+		}
+		return articles.filter((article) => {
+			const authorsList = article.authors || article.author || [];
+			const haystacks = [
+				article.title,
+				article.text,
+				article.source,
+				Array.isArray(authorsList) ? authorsList.join(" ") : undefined,
+				Array.isArray(article.keywords) ? article.keywords.join(" ") : undefined,
+				Array.isArray(article.tags) ? article.tags.join(" ") : undefined,
+			];
+			return haystacks.some((value) =>
+				value ? value.toLowerCase().includes(term) : false
+			);
+		});
+	}, [articles, searchQuery]);
+
+	const preparedReports = useMemo<PreparedArticle[]>(() => {
+		return filteredArticles.map((article, index) => {
+			const source = deriveSource(article.source, article.link);
+			const publishInfo = parsePublishDate(article.publish_date);
+			// Handle both 'authors' and 'author' fields
+			const authorsList = article.authors || article.author || [];
+			const authors = Array.isArray(authorsList) ? authorsList.filter(Boolean) : [];
+			const keywords = Array.isArray(article.keywords) ? article.keywords.filter(Boolean) : [];
+			const tags = Array.isArray(article.tags) ? article.tags.filter(Boolean) : [];
+			const wordCount = article.text ? article.text.trim().split(/\s+/).filter(Boolean).length : 0;
+			const keyMetrics: Record<string, string> = {
+				authors: authors.length ? authors.join(", ") : "Unknown authors",
+				keywords: keywords.length ? `${keywords.length} keywords` : "No keywords",
+				tags: tags.length ? `${tags.length} tags` : "No tags",
+			};
+
+			return {
+				id: article.link || `article-${index}`,
+				title: article.title || "Untitled",
+				source,
+				company: source,
+				extractedAt: publishInfo.formatted,
+				publishedAt: publishInfo.date,
+				sentiment: "neutral",
+				status: publishInfo.date ? "enriched" : "scraped",
+				url: article.link || "#",
+				summary: buildSummary(article.text),
+				keyMetrics,
+				keywords,
+				tags,
+				authors,
+				wordCount,
+			};
+		});
+	}, [filteredArticles]);
+
+	const timelineReports = useMemo(() => {
+		return [...preparedReports]
+			.sort((a, b) => {
+				const aTime = a.publishedAt ? a.publishedAt.getTime() : 0;
+				const bTime = b.publishedAt ? b.publishedAt.getTime() : 0;
+				return bTime - aTime;
+			})
+			.slice(0, 5);
+	}, [preparedReports]);
+
+	const aggregatedStats = useMemo(() => {
+		if (preparedReports.length === 0) {
+			return {
+				uniqueSources: 0,
+				uniqueAuthors: 0,
+				averageWordCount: 0,
+				totalKeywords: 0,
+				totalTags: 0,
+				topKeywords: [] as string[],
+				topTags: [] as string[],
+			};
+		}
+
+		const sourceSet = new Set<string>();
+		const authorSet = new Set<string>();
+		const keywordCounts = new Map<string, number>();
+		const tagCounts = new Map<string, number>();
+		let totalWords = 0;
+
+		preparedReports.forEach((report) => {
+			sourceSet.add(report.source);
+			report.authors.forEach((author) => authorSet.add(author));
+			report.keywords.forEach((keyword) => {
+				const key = keyword.toLowerCase();
+				keywordCounts.set(key, (keywordCounts.get(key) ?? 0) + 1);
+			});
+			report.tags.forEach((tag) => {
+				const key = tag.toLowerCase();
+				tagCounts.set(key, (tagCounts.get(key) ?? 0) + 1);
+			});
+			totalWords += report.wordCount;
+		});
+
+		const sortedKeywords = [...keywordCounts.entries()].sort((a, b) => b[1] - a[1]);
+		const sortedTags = [...tagCounts.entries()].sort((a, b) => b[1] - a[1]);
+
+		return {
+			uniqueSources: sourceSet.size,
+			uniqueAuthors: authorSet.size,
+			averageWordCount: Math.round(totalWords / preparedReports.length) || 0,
+			totalKeywords: keywordCounts.size,
+			totalTags: tagCounts.size,
+			topKeywords: sortedKeywords.slice(0, 3).map(([keyword]) => keyword),
+			topTags: sortedTags.slice(0, 3).map(([tag]) => tag),
+		};
+	}, [preparedReports]);
+
+	const summaryHighlights = useMemo(() => {
+		if (preparedReports.length === 0) {
+			return [] as Array<{ title: string; description: string; color: string }>;
+		}
+
+		const highlights: Array<{ title: string; description: string; color: string }> = [];
+		const articleLabel = preparedReports.length === 1 ? "article" : "articles";
+		const sourceLabel = aggregatedStats.uniqueSources === 1 ? "source" : "sources";
+		const authorLabel = aggregatedStats.uniqueAuthors === 1 ? "author" : "authors";
+
+		highlights.push({
+			title: `Collected ${preparedReports.length} ${articleLabel}`,
+			description: `Coverage spans ${aggregatedStats.uniqueSources} ${sourceLabel} and ${aggregatedStats.uniqueAuthors} unique ${authorLabel}.`,
+			color: "bg-green-500",
+		});
+
+		if (aggregatedStats.topKeywords.length > 0) {
+			highlights.push({
+				title: "Recurring keyword themes",
+				description: aggregatedStats.topKeywords.join(", "),
+				color: "bg-blue-500",
+			});
+		}
+
+		if (aggregatedStats.topTags.length > 0) {
+			highlights.push({
+				title: "Most common tags",
+				description: aggregatedStats.topTags.join(", "),
+				color: "bg-purple-500",
+			});
+		}
+
+		if (timelineReports.length > 0) {
+			const recent = timelineReports[0];
+			highlights.push({
+				title: "Most recent update",
+				description: `${recent.source} • ${recent.extractedAt}`,
+				color: "bg-amber-500",
+			});
+		}
+
+		return highlights;
+	}, [aggregatedStats, preparedReports, timelineReports]);
+
+	const handleExtract = async () => {
+		const parsedCount = Number.parseInt(countInput, 10);
+		const parsedMax = Number.parseInt(maxArticlesInput, 10);
+		const safeCount = Number.isNaN(parsedCount) ? scrapeParams.count : Math.max(1, parsedCount);
+		const safeMax = Number.isNaN(parsedMax) ? scrapeParams.maxArticles : Math.max(1, parsedMax);
+		const websites = parseWebsiteInput(websiteInput);
+
+		setScrapeParams({
+			count: safeCount,
+			maxArticles: safeMax,
+			websites,
+		});
+		
+		// Trigger scraping with new params
+		await refetchScrape();
+		// Refresh saved articles after scraping
+		await refetchSaved();
+	};
+
+	const handleRefresh = () => {
+		refetch();
+	};
+
+	// Only show the main centered loading state when we have no articles yet.
+	// This prevents the large "Fetching latest articles…" spinner from
+	// covering the UI while background refetches occur when articles are
+	// already present.
+	const loadingState = (isLoading || isPending) && articles.length === 0;
+	const refetching = isFetching && !loadingState;
+	const totalArticles = scrapeData?.total_articles ?? articles.length;
+	const filteredCount = preparedReports.length;
+	const errorMessage = isError
+		? error instanceof Error
+			? error.message
+			: "Unable to fetch articles."
+		: undefined;
+
 	return (
 		<div className="space-y-6">
 			{/* Header */}
@@ -193,9 +434,14 @@ export default function BrokerReports() {
 								Configure and monitor data sources for automatic information
 								extraction
 							</p>
-							<Button variant="outline" size="sm">
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={handleRefresh}
+								disabled={loadingState}
+							>
 								<RefreshCw className="h-4 w-4 mr-1" />
-								Refresh All
+								{loadingState ? "Refreshing" : "Refresh All"}
 							</Button>
 						</div>
 
@@ -262,31 +508,61 @@ export default function BrokerReports() {
 				</CardHeader>
 				<CardContent>
 					<div className="space-y-4">
-						<div className="flex space-x-2">
-							<div className="flex-1">
-								<input
-									type="text"
-									placeholder="Enter company ticker or name (e.g., AAPL, Apple Inc.)"
-									className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-									defaultValue="AAPL"
-								/>
-							</div>
-							<Button>
-								<Search className="h-4 w-4 mr-1" />
-								Extract Reports
-							</Button>
+						<div className="grid gap-3 md:grid-cols-[2fr_1fr_1fr]">
+							<Input
+								value={searchQuery}
+								onChange={(event) => setSearchQuery(event.target.value)}
+								placeholder="Filter articles by keyword, title, or source"
+							/>
+							<Input
+								type="number"
+								min={1}
+								value={countInput}
+								onChange={(event) => setCountInput(event.target.value)}
+								placeholder="Articles per source"
+							/>
+							<Input
+								type="number"
+								min={1}
+								value={maxArticlesInput}
+								onChange={(event) => setMaxArticlesInput(event.target.value)}
+								placeholder="Max articles"
+							/>
 						</div>
 
-						<div className="flex items-center space-x-4 text-sm text-muted-foreground">
-							<div className="flex items-center space-x-1">
-								<Filter className="h-4 w-4" />
-								<span>Time Range: Last 24 hours</span>
+						<Textarea
+							value={websiteInput}
+							onChange={(event) => setWebsiteInput(event.target.value)}
+							placeholder="Optional: provide custom websites (comma or newline separated)"
+							className="min-h-[80px]"
+						/>
+
+						<div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+							<div className="flex items-center space-x-4 text-sm text-muted-foreground">
+								<div className="flex items-center space-x-1">
+									<Filter className="h-4 w-4" />
+									<span>{`Count per source: ${scrapeParams.count}`}</span>
+								</div>
+								<div className="flex items-center space-x-1">
+									<Globe className="h-4 w-4" />
+									<span>
+										{scrapeParams.websites.length > 0
+											? `${scrapeParams.websites.length} custom source(s)`
+											: "Using default source list"}
+									</span>
+								</div>
 							</div>
-							<div className="flex items-center space-x-1">
-								<Globe className="h-4 w-4" />
-								<span>Sources: 5 active</span>
-							</div>
+							<Button onClick={handleExtract} disabled={loadingState}>
+								<Search className="h-4 w-4 mr-1" />
+								{loadingState ? "Extracting" : "Extract Reports"}
+						</Button>
+					</div>
+
+					{scrapeData?.message ? (
+						<div className="text-xs text-muted-foreground">
+							Status: {scrapeData.message}
 						</div>
+					) : null}
 					</div>
 				</CardContent>
 			</Card>
@@ -299,76 +575,120 @@ export default function BrokerReports() {
 							<FileText className="h-5 w-5" />
 							<span>Extracted Reports</span>
 						</div>
-						<Badge variant="secondary">
-							{extractedReports.length} reports found
-						</Badge>
+						<div className="flex items-center space-x-2">
+							<Badge variant="secondary">
+								{filteredCount} {filteredCount === 1 ? "article" : "articles"}
+							</Badge>
+							{refetching ? (
+								<Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+							) : null}
+						</div>
 					</CardTitle>
 				</CardHeader>
 				<CardContent>
 					<div className="space-y-4">
-						{extractedReports.map((report) => (
-							<div key={report.id} className="p-4 border rounded-lg space-y-3">
-								<div className="flex items-start justify-between">
-									<div className="flex-1">
-										<div className="flex items-center space-x-2 mb-1">
-											<h3 className="font-medium text-sm">{report.title}</h3>
-											<ExternalLink className="h-3 w-3 text-muted-foreground" />
-										</div>
-										<div className="flex items-center space-x-4 text-xs text-muted-foreground">
-											<span>{report.source}</span>
-											<span>•</span>
-											<span>{report.extractedAt}</span>
-											<span>•</span>
-											<span>{report.company}</span>
-										</div>
-									</div>
-									<div className="flex items-center space-x-2">
-										<Badge
-											variant={
-												report.sentiment === "positive"
-													? "default"
-													: report.sentiment === "negative"
-													? "destructive"
-													: "secondary"
-											}
-										>
-											{report.sentiment === "positive" && (
-												<TrendingUp className="h-3 w-3 mr-1" />
-											)}
-											{report.sentiment === "negative" && (
-												<TrendingDown className="h-3 w-3 mr-1" />
-											)}
-											{report.sentiment === "neutral" && (
-												<Minus className="h-3 w-3 mr-1" />
-											)}
-											{report.sentiment}
-										</Badge>
-										<Badge variant="outline">{report.status}</Badge>
-									</div>
-								</div>
-
-								<div className="grid gap-2 md:grid-cols-3">
-									{Object.entries(report.keyMetrics).map(([key, value]) => (
-										<div
-											key={key}
-											className="text-center p-2 bg-muted/20 rounded"
-										>
-											<p className="text-xs text-muted-foreground capitalize">
-												{key}
-											</p>
-											<p className="font-medium text-sm">{value}</p>
-										</div>
-									))}
-								</div>
+						{loadingState ? (
+							<div className="flex items-center justify-center py-10 text-muted-foreground">
+								<Loader2 className="mr-2 h-5 w-5 animate-spin" />
+								Fetching latest articles…
 							</div>
-						))}
+						) : isError ? (
+							<div className="flex items-center gap-2 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+								<AlertCircle className="h-4 w-4" />
+								<span>{errorMessage}</span>
+							</div>
+						) : preparedReports.length === 0 ? (
+							<p className="text-sm text-muted-foreground">
+								No articles match the current filters. Adjust your query or scrape new sources.
+							</p>
+						) : (
+							<>
+								{preparedReports.map((report) => (
+									<div key={report.id} className="p-4 border rounded-lg space-y-3">
+										<div className="flex items-start justify-between">
+											<div className="flex-1">
+												<div className="flex items-center space-x-2 mb-1">
+													<a
+														href={report.url}
+														target="_blank"
+														rel="noopener noreferrer"
+														className="font-medium text-sm hover:underline"
+													>
+															{report.title}
+														</a>
+													<ExternalLink className="h-3 w-3 text-muted-foreground" />
+												</div>
+												<div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+													<span>{report.source}</span>
+													<span>•</span>
+													<span>{report.extractedAt}</span>
+													{report.company ? (
+														<>
+															<span>•</span>
+															<span>{report.company}</span>
+														</>
+													) : null}
+												</div>
+											</div>
+											<div className="flex items-center space-x-2">
+												<Badge
+													variant={
+														report.sentiment === "positive"
+															? "default"
+														: report.sentiment === "negative"
+														? "destructive"
+														: "secondary"
+													}
+												>
+													{report.sentiment === "positive" && (
+														<TrendingUp className="h-3 w-3 mr-1" />
+													)}
+													{report.sentiment === "negative" && (
+														<TrendingDown className="h-3 w-3 mr-1" />
+													)}
+													{report.sentiment === "neutral" && (
+														<Minus className="h-3 w-3 mr-1" />
+													)}
+													{report.sentiment}
+												</Badge>
+												<Badge variant="outline">{report.status}</Badge>
+											</div>
+										</div>
 
-						<div className="flex justify-center mt-6">
-							<Button className="bg-accent text-accent-foreground">
-								<FileText className="h-4 w-4 mr-1" />
-								Synthesize All Reports
-							</Button>
-						</div>
+										<p className="text-sm text-muted-foreground leading-relaxed">
+											{report.summary}
+										</p>
+
+										<div className="grid gap-2 md:grid-cols-3">
+											{Object.entries(report.keyMetrics).map(([key, value]) => (
+												<div key={key} className="text-center p-2 bg-muted/20 rounded">
+													<p className="text-xs text-muted-foreground capitalize">
+														{key}
+													</p>
+													<p className="font-medium text-sm">{value}</p>
+												</div>
+											))}
+										</div>
+									</div>
+								))}
+
+								<div className="flex flex-wrap items-center justify-between gap-2 border-t pt-4 text-xs text-muted-foreground">
+									<span>
+										Showing {filteredCount} of {totalArticles} scraped article
+										{totalArticles === 1 ? "" : "s"}.
+									</span>
+									<Button
+										size="sm"
+										variant="secondary"
+										className="bg-accent text-accent-foreground"
+										disabled={preparedReports.length === 0}
+									>
+										<FileText className="h-4 w-4 mr-1" />
+										Synthesize All Reports
+									</Button>
+								</div>
+							</>
+						)}
 					</div>
 				</CardContent>
 			</Card>
@@ -446,15 +766,18 @@ export default function BrokerReports() {
 							<div className="space-y-4">
 								<div className="flex items-center justify-between">
 									<div className="flex items-center space-x-2">
-										<Badge variant="default">Auto-Generated</Badge>
-										<Badge variant="outline">High Confidence</Badge>
+										<Badge variant="default">Live Data</Badge>
+										<Badge variant="outline">
+											{aggregatedStats.uniqueSources} source
+											{aggregatedStats.uniqueSources === 1 ? "" : "s"}
+										</Badge>
 									</div>
 									<div className="flex space-x-2">
-										<Button variant="outline" size="sm">
+										<Button variant="outline" size="sm" disabled={preparedReports.length === 0}>
 											<Save className="h-4 w-4 mr-1" />
 											Save
 										</Button>
-										<Button variant="outline" size="sm">
+										<Button variant="outline" size="sm" disabled={preparedReports.length === 0}>
 											<Download className="h-4 w-4 mr-1" />
 											Export
 										</Button>
@@ -463,69 +786,34 @@ export default function BrokerReports() {
 
 								<div className="p-4 bg-muted/20 rounded-lg">
 									<h3 className="font-medium mb-2">Synthesis Summary</h3>
-									<p className="text-sm text-muted-foreground mb-4">
-										Based on 4 sources extracted in the last 4 hours, here's the
-										comprehensive analysis:
-									</p>
+									{preparedReports.length === 0 ? (
+										<p className="text-sm text-muted-foreground">
+											Run an extraction to populate the synthesis overview.
+										</p>
+									) : (
+										<>
+											<p className="text-sm text-muted-foreground mb-4">
+												Based on {preparedReports.length} article
+												{preparedReports.length === 1 ? "" : "s"} collected from
+												 {aggregatedStats.uniqueSources} source
+												{aggregatedStats.uniqueSources === 1 ? "" : "s"}, here are the active themes:
+											</p>
 
-									<div className="space-y-3">
-										<div className="flex items-start space-x-3">
-											<div className="w-2 h-2 rounded-full bg-green-500 mt-2" />
-											<div>
-												<p className="font-medium text-sm">
-													Strong Q3 Financial Performance
-												</p>
-												<p className="text-xs text-muted-foreground">
-													Apple reported Q3 earnings with $81.8B revenue and
-													$1.26 EPS, exceeding analyst expectations. Services
-													revenue showed particular strength with 15% YoY
-													growth.
-												</p>
+											<div className="space-y-3">
+												{summaryHighlights.map((highlight, index) => (
+													<div key={index} className="flex items-start space-x-3">
+														<div className={`w-2 h-2 rounded-full ${highlight.color} mt-2`} />
+														<div>
+															<p className="font-medium text-sm">{highlight.title}</p>
+															<p className="text-xs text-muted-foreground">
+																{highlight.description || "Details unavailable."}
+															</p>
+														</div>
+													</div>
+												))}
 											</div>
-										</div>
-
-										<div className="flex items-start space-x-3">
-											<div className="w-2 h-2 rounded-full bg-red-500 mt-2" />
-											<div>
-												<p className="font-medium text-sm">
-													China Regulatory Challenges
-												</p>
-												<p className="text-xs text-muted-foreground">
-													AI features facing regulatory hurdles in China,
-													potentially impacting 18% market share in the region
-													with medium-term implications for Q4 2025.
-												</p>
-											</div>
-										</div>
-
-										<div className="flex items-start space-x-3">
-											<div className="w-2 h-2 rounded-full bg-green-500 mt-2" />
-											<div>
-												<p className="font-medium text-sm">
-													iPhone 16 Strong Pre-Order Performance
-												</p>
-												<p className="text-xs text-muted-foreground">
-													iPhone 16 pre-orders showing 25% YoY increase, leading
-													to analyst upgrades and $210 price target from
-													MarketWatch coverage.
-												</p>
-											</div>
-										</div>
-
-										<div className="flex items-start space-x-3">
-											<div className="w-2 h-2 rounded-full bg-blue-500 mt-2" />
-											<div>
-												<p className="font-medium text-sm">
-													Strong Balance Sheet Position
-												</p>
-												<p className="text-xs text-muted-foreground">
-													Latest 10-Q filing shows $162.1B cash position with
-													$104.5B debt and $7.2B capex, indicating healthy
-													financial foundation.
-												</p>
-											</div>
-										</div>
-									</div>
+										</>
+									)}
 								</div>
 							</div>
 						</TabsContent>
@@ -536,48 +824,41 @@ export default function BrokerReports() {
 									<CardTitle>Source Reliability & Coverage</CardTitle>
 								</CardHeader>
 								<CardContent>
-									<div className="space-y-4">
-										{extractedReports.map((report) => (
-											<div
-												key={report.id}
-												className="flex items-center justify-between p-3 border rounded-lg"
-											>
-												<div className="flex items-center space-x-3">
+									{preparedReports.length === 0 ? (
+										<p className="text-sm text-muted-foreground">
+											Scrape articles to review source reliability.
+										</p>
+									) : (
+										<div className="space-y-4">
+											{preparedReports.slice(0, 12).map((report) => {
+												const meta = getSourceMeta(report.source);
+												return (
 													<div
-														className={`w-3 h-3 rounded-full ${
-															report.source === "SEC EDGAR"
-																? "bg-blue-500"
-																: report.source === "Yahoo Finance"
-																? "bg-purple-500"
-																: report.source === "Bloomberg"
-																? "bg-orange-500"
-																: "bg-green-500"
-														}`}
-													/>
-													<div>
-														<p className="font-medium text-sm">
-															{report.source}
-														</p>
-														<p className="text-xs text-muted-foreground">
-															{report.title}
-														</p>
+														key={report.id}
+														className="flex items-center justify-between p-3 border rounded-lg"
+													>
+														<div className="flex items-center space-x-3">
+															<div className={`w-3 h-3 rounded-full ${meta.color}`} />
+															<div>
+																<p className="font-medium text-sm">{report.source}</p>
+																<p className="text-xs text-muted-foreground line-clamp-1">
+																	{report.title}
+																</p>
+															</div>
+														</div>
+														<div className="flex items-center space-x-2">
+															<Badge variant="outline" className="text-xs">
+																{meta.label}
+															</Badge>
+															<span className="text-xs text-muted-foreground">
+																{report.extractedAt}
+															</span>
+														</div>
 													</div>
-												</div>
-												<div className="flex items-center space-x-2">
-													<Badge variant="outline" className="text-xs">
-														{report.source === "SEC EDGAR"
-															? "Official"
-															: report.source === "Bloomberg"
-															? "Premium"
-															: "Public"}
-													</Badge>
-													<span className="text-xs text-muted-foreground">
-														{report.extractedAt}
-													</span>
-												</div>
-											</div>
-										))}
-									</div>
+												);
+											})}
+										</div>
+									)}
 								</CardContent>
 							</Card>
 						</TabsContent>
@@ -588,65 +869,79 @@ export default function BrokerReports() {
 									<CardTitle>Aggregated Key Metrics</CardTitle>
 								</CardHeader>
 								<CardContent>
-									<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-										<div className="text-center p-4 bg-muted/20 rounded-lg">
-											<p className="text-2xl font-bold text-green-600">
-												$81.8B
-											</p>
-											<p className="text-sm text-muted-foreground">
-												Q3 Revenue
-											</p>
-											<p className="text-xs text-muted-foreground">
-												Yahoo Finance
-											</p>
-										</div>
-										<div className="text-center p-4 bg-muted/20 rounded-lg">
-											<p className="text-2xl font-bold">$1.26</p>
-											<p className="text-sm text-muted-foreground">EPS</p>
-											<p className="text-xs text-muted-foreground">
-												SEC Filing
-											</p>
-										</div>
-										<div className="text-center p-4 bg-muted/20 rounded-lg">
-											<p className="text-2xl font-bold text-green-600">+25%</p>
-											<p className="text-sm text-muted-foreground">
-												Pre-Orders YoY
-											</p>
-											<p className="text-xs text-muted-foreground">
-												MarketWatch
-											</p>
-										</div>
-										<div className="text-center p-4 bg-muted/20 rounded-lg">
-											<p className="text-2xl font-bold">$162.1B</p>
-											<p className="text-sm text-muted-foreground">
-												Cash Position
-											</p>
-											<p className="text-xs text-muted-foreground">
-												10-Q Filing
-											</p>
-										</div>
-									</div>
+									{preparedReports.length === 0 ? (
+										<p className="text-sm text-muted-foreground">
+											Scraped article metrics will appear here once data is available.
+										</p>
+									) : (
+										<>
+											<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+												<div className="text-center p-4 bg-muted/20 rounded-lg">
+													<p className="text-2xl font-bold text-primary">
+														{preparedReports.length}
+													</p>
+													<p className="text-sm text-muted-foreground">Articles collected</p>
+												</div>
+												<div className="text-center p-4 bg-muted/20 rounded-lg">
+													<p className="text-2xl font-bold">
+														{aggregatedStats.averageWordCount}
+													</p>
+													<p className="text-sm text-muted-foreground">Avg. word count</p>
+												</div>
+												<div className="text-center p-4 bg-muted/20 rounded-lg">
+													<p className="text-2xl font-bold text-green-600">
+														{aggregatedStats.totalKeywords}
+													</p>
+													<p className="text-sm text-muted-foreground">Unique keywords</p>
+												</div>
+												<div className="text-center p-4 bg-muted/20 rounded-lg">
+													<p className="text-2xl font-bold text-blue-600">
+														{aggregatedStats.totalTags}
+													</p>
+													<p className="text-sm text-muted-foreground">Unique tags</p>
+												</div>
+											</div>
 
-									<div className="mt-6 p-4 bg-muted/20 rounded-lg">
-										<h4 className="font-medium mb-3">Sentiment Analysis</h4>
-										<div className="space-y-2">
-											<div className="flex items-center justify-between text-sm">
-												<span>Overall Sentiment: Positive</span>
-												<span>Confidence: 85%</span>
+											<div className="mt-6 grid gap-4 lg:grid-cols-2">
+												<div className="p-4 bg-muted/20 rounded-lg space-y-3">
+													<h4 className="font-medium">Keyword Momentum</h4>
+													{aggregatedStats.topKeywords.length === 0 ? (
+														<p className="text-xs text-muted-foreground">
+															No recurring keywords detected yet.
+														</p>
+													) : (
+														<ul className="space-y-2 text-xs text-muted-foreground">
+															{aggregatedStats.topKeywords.map((keyword) => (
+																<li key={keyword} className="flex justify-between">
+																	<span className="capitalize">{keyword}</span>
+																	<span>Trending</span>
+																</li>
+															))}
+														</ul>
+													)}
+												</div>
+												<div className="p-4 bg-muted/20 rounded-lg space-y-3">
+													<h4 className="font-medium">Source Diversity</h4>
+													<p className="text-xs text-muted-foreground">
+														{aggregatedStats.uniqueSources} unique source
+														{aggregatedStats.uniqueSources === 1 ? "" : "s"} • {aggregatedStats.uniqueAuthors} contributor
+														{aggregatedStats.uniqueAuthors === 1 ? "" : "s"}
+													</p>
+													{aggregatedStats.topTags.length === 0 ? (
+														<p className="text-xs text-muted-foreground">Tag coverage pending.</p>
+													) : (
+														<ul className="space-y-2 text-xs text-muted-foreground">
+															{aggregatedStats.topTags.map((tag) => (
+																<li key={tag} className="capitalize">
+																	#{tag}
+																</li>
+															))}
+														</ul>
+													)}
+												</div>
 											</div>
-											<div className="w-full bg-gray-200 rounded-full h-2">
-												<div
-													className="bg-green-500 h-2 rounded-full"
-													style={{ width: "75%" }}
-												></div>
-											</div>
-											<div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
-												<span>2 Positive</span>
-												<span>1 Negative</span>
-												<span>1 Neutral</span>
-											</div>
-										</div>
-									</div>
+										</>
+									)}
 								</CardContent>
 							</Card>
 						</TabsContent>
@@ -657,93 +952,42 @@ export default function BrokerReports() {
 									<CardTitle>Information Timeline</CardTitle>
 								</CardHeader>
 								<CardContent>
-									<div className="space-y-4">
-										<div className="relative">
-											<div className="absolute left-4 top-0 bottom-0 w-0.5 bg-border"></div>
-
-											<div className="space-y-6">
-												<div className="flex items-start space-x-4">
-													<div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-medium">
-														1h
-													</div>
-													<div className="flex-1">
-														<div className="flex items-center justify-between">
-															<h4 className="font-medium text-sm">
-																SEC 10-Q Filing Released
-															</h4>
-															<span className="text-xs text-muted-foreground">
-																SEC EDGAR
-															</span>
+									{timelineReports.length === 0 ? (
+										<p className="text-sm text-muted-foreground">
+											Articles with publish dates will appear in chronological order once scraped.
+										</p>
+									) : (
+										<div className="space-y-4">
+											<div className="relative">
+												<div className="absolute left-4 top-0 bottom-0 w-0.5 bg-border" />
+												<div className="space-y-6">
+													{timelineReports.map((report, index) => (
+														<div key={report.id} className="flex items-start space-x-4">
+															<div className="w-8 h-8 rounded-full bg-primary/80 flex items-center justify-center text-white text-xs font-medium">
+																{index + 1}
+															</div>
+															<div className="flex-1">
+																<div className="flex items-center justify-between">
+																	<h4 className="font-medium text-sm line-clamp-1">
+																		{report.title}
+																	</h4>
+																	<span className="text-xs text-muted-foreground">
+																		{report.source}
+																	</span>
+																</div>
+																<p className="text-xs text-muted-foreground mt-1">
+																	{report.summary}
+																</p>
+																<p className="mt-1 text-xs text-muted-foreground">
+																		{report.extractedAt}
+																	</p>
+															</div>
 														</div>
-														<p className="text-xs text-muted-foreground mt-1">
-															Official quarterly financial data showing strong
-															cash position and operational metrics
-														</p>
-													</div>
-												</div>
-
-												<div className="flex items-start space-x-4">
-													<div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-white text-xs font-medium">
-														2h
-													</div>
-													<div className="flex-1">
-														<div className="flex items-center justify-between">
-															<h4 className="font-medium text-sm">
-																Strong Q3 Earnings Report
-															</h4>
-															<span className="text-xs text-muted-foreground">
-																Yahoo Finance
-															</span>
-														</div>
-														<p className="text-xs text-muted-foreground mt-1">
-															Earnings beat expectations with services revenue
-															showing 15% growth
-														</p>
-													</div>
-												</div>
-
-												<div className="flex items-start space-x-4">
-													<div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center text-white text-xs font-medium">
-														3h
-													</div>
-													<div className="flex-1">
-														<div className="flex items-center justify-between">
-															<h4 className="font-medium text-sm">
-																China AI Regulatory Concerns
-															</h4>
-															<span className="text-xs text-muted-foreground">
-																Bloomberg
-															</span>
-														</div>
-														<p className="text-xs text-muted-foreground mt-1">
-															AI features facing regulatory hurdles in China
-															market
-														</p>
-													</div>
-												</div>
-
-												<div className="flex items-start space-x-4">
-													<div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-white text-xs font-medium">
-														4h
-													</div>
-													<div className="flex-1">
-														<div className="flex items-center justify-between">
-															<h4 className="font-medium text-sm">
-																iPhone 16 Pre-Order Success
-															</h4>
-															<span className="text-xs text-muted-foreground">
-																MarketWatch
-															</span>
-														</div>
-														<p className="text-xs text-muted-foreground mt-1">
-															25% YoY increase in pre-orders leading to analyst
-															upgrades
-														</p>
-													</div>
+													))}
 												</div>
 											</div>
 										</div>
-									</div>
+									)}
 								</CardContent>
 							</Card>
 						</TabsContent>
