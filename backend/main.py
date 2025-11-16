@@ -11,6 +11,7 @@ from routes import (
     market_summary,
     admin_settings,
     auth,
+    user_content,
 )
 from services.database import client  # Initialize database connection
 
@@ -48,6 +49,7 @@ app.include_router(editorial_assistant.router)
 app.include_router(market_summary.router)
 app.include_router(admin_settings.router)
 app.include_router(auth.router)
+app.include_router(user_content.router)
 
 
 if __name__ == "__main__":

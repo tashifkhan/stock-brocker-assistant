@@ -21,8 +21,65 @@ def get_collection(name: str) -> Collection:
 
 
 users_collection: Collection = get_collection("users")
+articles_collection: Collection = get_collection("articles")
+report_analysis_collection: Collection = get_collection("report_analysis")
+financial_analysis_collection: Collection = get_collection("financial_analysis")
+market_filings_collection: Collection = get_collection("market_filings")
+watchlists_collection: Collection = get_collection("watchlists")
+favorite_articles_collection: Collection = get_collection("favorite_articles")
 
 # Ensure useful indexes exist (no-op if already created)
-users_collection.create_index([("email", ASCENDING)], unique=True)
-users_collection.create_index([("username", ASCENDING)], unique=True)
-users_collection.create_index([("reset_token", ASCENDING)], unique=True, sparse=True)
+users_collection.create_index(
+    [("email", ASCENDING)],
+    unique=True,
+)
+users_collection.create_index(
+    [("username", ASCENDING)],
+    unique=True,
+)
+users_collection.create_index(
+    [("reset_token", ASCENDING)],
+    unique=True,
+    sparse=True,
+)
+
+articles_collection.create_index(
+    [("link", ASCENDING)],
+    unique=True,
+)
+articles_collection.create_index(
+    [("created_at", ASCENDING)],
+)
+
+report_analysis_collection.create_index(
+    [("created_at", ASCENDING)],
+)
+
+financial_analysis_collection.create_index(
+    [("created_at", ASCENDING)],
+)
+financial_analysis_collection.create_index(
+    [("file_id", ASCENDING)],
+    unique=True,
+)
+
+market_filings_collection.create_index(
+    [("source", ASCENDING), ("link", ASCENDING)],
+    unique=True,
+)
+market_filings_collection.create_index(
+    [("created_at", ASCENDING)],
+)
+
+watchlists_collection.create_index(
+    [("user_id", ASCENDING)],
+    unique=True,
+)
+
+favorite_articles_collection.create_index(
+    [("user_id", ASCENDING), ("article_id", ASCENDING)],
+    unique=True,
+)
+favorite_articles_collection.create_index(
+    [("created_at", ASCENDING)],
+)

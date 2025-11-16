@@ -1,14 +1,18 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
-from pydantic import BaseModel
-from typing import Optional
+import asyncio
 import os
 import tempfile
 import uuid
+from typing import List, Optional
+
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile
+from pydantic import BaseModel
 
 from services.process_pdf import convert_pdf_to_md
 from services.report_analysis.parameter_generation import generate_evaluation_parameters
 from services.report_analysis.summary_generator import generate_report_summary
 from services.report_analysis.types import EvaluationParameters
+from services.content_service import list_financial_analysis, save_financial_analysis
+from models.content import FinancialAnalysisRecord
 
 router = APIRouter(prefix="/financial-data", tags=["financial-data"])
 
@@ -79,7 +83,7 @@ async def upload_financial_document(file: UploadFile = File(...)) -> FileUploadR
 
 
 @router.post("/analyze")
-def analyze_financial_document(request: AnalysisRequest) -> AnalysisResponse:
+async def analyze_financial_document(request: AnalysisRequest) -> AnalysisResponse:
     """
     Analyze an uploaded financial document.
 
@@ -97,7 +101,7 @@ def analyze_financial_document(request: AnalysisRequest) -> AnalysisResponse:
         file_path = file_info["path"]
 
         # Convert PDF to Markdown
-        markdown_content = convert_pdf_to_md(file_path)
+        markdown_content = await asyncio.to_thread(convert_pdf_to_md, file_path)
 
         # Generate evaluation parameters
         parameters = generate_evaluation_parameters(markdown_content)
@@ -111,6 +115,22 @@ def analyze_financial_document(request: AnalysisRequest) -> AnalysisResponse:
         file_info["status"] = "analyzed"
         file_info["parameters"] = parameters
         file_info["summary"] = summary
+
+        parameters_payload = (
+            parameters.model_dump()
+            if parameters and hasattr(parameters, "model_dump")
+            else parameters
+        )
+
+        await save_financial_analysis(
+            file_id=request.file_id,
+            filename=file_info["filename"],
+            parameters=(
+                parameters_payload if isinstance(parameters_payload, dict) else None
+            ),
+            summary=summary,
+            status=file_info["status"],
+        )
 
         return AnalysisResponse(
             file_id=request.file_id,
@@ -151,3 +171,11 @@ def get_file_analysis(file_id: str) -> AnalysisResponse:
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/history", response_model=List[FinancialAnalysisRecord])
+async def get_financial_analysis_history(
+    limit: int = Query(20, ge=1, le=200),
+):
+    records = await list_financial_analysis(limit=limit)
+    return records

@@ -1,12 +1,15 @@
-from fastapi import APIRouter, HTTPException
+from typing import List, Optional
+
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
-from typing import Optional
 from services.report_analysis.parameter_generation import generate_evaluation_parameters
 from services.report_analysis.parameter_evaluator import (
     generate_evaluated_parameter_code,
 )
 from services.report_analysis.summary_generator import generate_report_summary
 from services.report_analysis.types import EvaluationParameters
+from services.content_service import list_report_analysis, save_report_analysis
+from models.content import ReportAnalysisRecord
 
 router = APIRouter(prefix="/report-analysis", tags=["report-analysis"])
 
@@ -125,7 +128,7 @@ def generate_summary(request: SummaryRequest) -> dict:
 
 
 @router.post("/full-analysis")
-def full_analysis(request: ReportRequest) -> dict:
+async def full_analysis(request: ReportRequest) -> dict:
     """
     Perform a complete analysis: generate parameters, evaluate them, and create a summary.
 
@@ -150,17 +153,34 @@ def full_analysis(request: ReportRequest) -> dict:
         # Step 3: Generate summary
         summary = generate_report_summary(request.report, parameters)
 
-        return {
+        parameters_payload = (
+            parameters.model_dump() if hasattr(parameters, "model_dump") else parameters
+        )
+
+        response_payload = {
             "status": "success",
             "message": "Successfully completed full analysis",
-            "parameters": (
-                parameters.model_dump()
-                if hasattr(parameters, "model_dump")
-                else parameters
-            ),
+            "parameters": parameters_payload,
             "evaluation": evaluation,
             "summary": summary,
         }
+
+        parameters_dict = (
+            parameters_payload if isinstance(parameters_payload, dict) else {}
+        )
+
+        evaluation_payload = (
+            evaluation if isinstance(evaluation, dict) else {"value": evaluation}
+        )
+
+        await save_report_analysis(
+            report=request.report,
+            parameters=parameters_dict,
+            evaluation=evaluation_payload,
+            summary=summary,
+        )
+
+        return response_payload
 
     except HTTPException:
         raise
@@ -168,3 +188,11 @@ def full_analysis(request: ReportRequest) -> dict:
         raise HTTPException(
             status_code=500, detail=f"Error performing full analysis: {str(e)}"
         )
+
+
+@router.get("/history", response_model=List[ReportAnalysisRecord])
+async def get_report_analysis_history(
+    limit: int = Query(20, ge=1, le=100, description="Maximum records to return"),
+):
+    records = await list_report_analysis(limit=limit)
+    return records

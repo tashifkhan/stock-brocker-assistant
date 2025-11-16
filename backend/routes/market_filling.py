@@ -1,11 +1,15 @@
+import asyncio
+from typing import Dict, List, Optional
+
 from fastapi import APIRouter, HTTPException, Query
-from typing import List, Dict
 from pydantic import BaseModel, EmailStr
 
 # import the service modules
 from services.market_filling import us as us_service
 from services.market_filling import india as india_service
 from services.email_service.sender import send_email, EmailSenderError
+from services.content_service import list_market_filings, save_market_filings
+from models.content import MarketFilingRecord
 
 
 router = APIRouter(
@@ -22,7 +26,7 @@ class EmailRequest(BaseModel):
 
 
 @router.get("/us")
-def get_us_filings(count: int = Query(10, ge=1, le=100)) -> Dict[str, object]:
+async def get_us_filings(count: int = Query(10, ge=1, le=100)) -> Dict[str, object]:
     """Return recent US filings from the SEC feed.
 
     Query param:
@@ -30,7 +34,10 @@ def get_us_filings(count: int = Query(10, ge=1, le=100)) -> Dict[str, object]:
     """
 
     try:
-        results: List[Dict[str, str]] = us_service.fetch_recent_sec_filings(count=count)
+        results: List[Dict[str, str]] = await asyncio.to_thread(
+            us_service.fetch_recent_sec_filings, count=count
+        )
+        await save_market_filings("us", results)
         return {
             "source": "us",
             "count": len(results),
@@ -45,7 +52,7 @@ def get_us_filings(count: int = Query(10, ge=1, le=100)) -> Dict[str, object]:
 
 
 @router.get("/india")
-def get_india_filings(count: int = Query(10, ge=1, le=100)) -> Dict[str, object]:
+async def get_india_filings(count: int = Query(10, ge=1, le=100)) -> Dict[str, object]:
     """Return recent India filings/announcements from SEBI.
 
     Query param:
@@ -53,9 +60,10 @@ def get_india_filings(count: int = Query(10, ge=1, le=100)) -> Dict[str, object]
     """
 
     try:
-        results: List[Dict[str, str]] = india_service.fetch_recent_india_filings(
-            count=count
+        results: List[Dict[str, str]] = await asyncio.to_thread(
+            india_service.fetch_recent_india_filings, count=count
         )
+        await save_market_filings("india", results)
         return {
             "source": "india",
             "count": len(results),
@@ -70,7 +78,7 @@ def get_india_filings(count: int = Query(10, ge=1, le=100)) -> Dict[str, object]
 
 
 @router.post("/us/email")
-def send_us_filings_email(
+async def send_us_filings_email(
     email_request: EmailRequest, count: int = Query(10, ge=1, le=100)
 ) -> Dict[str, object]:
     """Fetch recent US SEC filings and send them via email.
@@ -84,7 +92,10 @@ def send_us_filings_email(
     """
     try:
         # Fetch the filings
-        results: List[Dict[str, str]] = us_service.fetch_recent_sec_filings(count=count)
+        results: List[Dict[str, str]] = await asyncio.to_thread(
+            us_service.fetch_recent_sec_filings, count=count
+        )
+        await save_market_filings("us", results)
 
         # Build email content
         subject = f"Latest US SEC Filings ({len(results)} items)"
@@ -110,12 +121,15 @@ def send_us_filings_email(
         html = "".join(html_lines)
 
         # Send email
-        send_email(
-            to=email_request.to,
-            subject=subject,
-            body=body,
-            html=html,
-            cc=email_request.cc,
+        await asyncio.to_thread(
+            send_email,
+            email_request.to,
+            subject,
+            body,
+            html,
+            None,
+            email_request.cc,
+            None,
         )
 
         return {
@@ -138,7 +152,7 @@ def send_us_filings_email(
 
 
 @router.post("/india/email")
-def send_india_filings_email(
+async def send_india_filings_email(
     email_request: EmailRequest, count: int = Query(10, ge=1, le=100)
 ) -> Dict[str, object]:
     """Fetch recent India SEBI filings and send them via email.
@@ -152,9 +166,10 @@ def send_india_filings_email(
     """
     try:
         # Fetch the filings
-        results: List[Dict[str, str]] = india_service.fetch_recent_india_filings(
-            count=count
+        results: List[Dict[str, str]] = await asyncio.to_thread(
+            india_service.fetch_recent_india_filings, count=count
         )
+        await save_market_filings("india", results)
 
         # Build email content
         subject = f"Latest India SEBI Filings ({len(results)} items)"
@@ -185,12 +200,15 @@ def send_india_filings_email(
         html = "".join(html_lines)
 
         # Send email
-        send_email(
-            to=email_request.to,
-            subject=subject,
-            body=body,
-            html=html,
-            cc=email_request.cc,
+        await asyncio.to_thread(
+            send_email,
+            email_request.to,
+            subject,
+            body,
+            html,
+            None,
+            email_request.cc,
+            None,
         )
 
         return {
@@ -210,3 +228,12 @@ def send_india_filings_email(
             status_code=502,
             detail=str(exc),
         )
+
+
+@router.get("/history", response_model=List[MarketFilingRecord])
+async def get_market_filings_history(
+    source: Optional[str] = Query(None, description="Optional source filter"),
+    limit: int = Query(50, ge=1, le=200),
+):
+    records = await list_market_filings(source=source, limit=limit)
+    return records
