@@ -137,10 +137,16 @@ async function apiCall<T>(
   const url = `${API_BASE_URL}${endpoint}`;
 
   const isFormData = options?.body instanceof FormData;
+  
+  // Get auth token if available
+  const token = localStorage.getItem('auth_token');
+  const authHeader = token ? { Authorization: `Bearer ${token}` } : {};
+  
   const defaultHeaders: HeadersInit = isFormData
-    ? (options?.headers as HeadersInit | undefined) ?? {}
+    ? { ...authHeader, ...(options?.headers as HeadersInit | undefined) }
     : {
         "Content-Type": "application/json",
+        ...authHeader,
         ...options?.headers,
       };
 
@@ -376,6 +382,119 @@ export const userSettingsApi = {
     return apiCall<any>("/admin/settings/user", {
       method: "POST",
       body: JSON.stringify(settings),
+    });
+  },
+};
+
+// ============ AUTH API ============
+
+export interface LoginResponse {
+  access_token: string;
+  token_type: string;
+}
+
+export interface UserPublic {
+  id: string;
+  email: string;
+  username: string;
+  is_active: boolean;
+  is_verified: boolean;
+  created_at: string;
+}
+
+export interface RegisterRequest {
+  email: string;
+  password: string;
+  username: string;
+}
+
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface ResetPasswordRequest {
+  token: string;
+  new_password: string;
+}
+
+export interface ChangePasswordRequest {
+  old_password: string;
+  new_password: string;
+}
+
+export interface ResendVerificationRequest {
+  email: string;
+}
+
+// Helper to get auth token from localStorage
+const getAuthToken = (): string | null => {
+  return localStorage.getItem('auth_token');
+};
+
+// Helper to add auth header
+const authHeaders = (): HeadersInit => {
+  const token = getAuthToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+export const authApi = {
+  register: (data: RegisterRequest) => {
+    return apiCall<UserPublic>("/auth/register", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  login: async (email: string, password: string): Promise<LoginResponse> => {
+    const formData = new URLSearchParams();
+    formData.append("username", email);
+    formData.append("password", password);
+
+    return apiCall<LoginResponse>("/auth/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: formData,
+    });
+  },
+
+  getMe: () => {
+    return apiCall<UserPublic>("/auth/me", {
+      headers: authHeaders(),
+    });
+  },
+
+  forgotPassword: (data: ForgotPasswordRequest) => {
+    return apiCall<{ message: string }>("/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  resetPassword: (data: ResetPasswordRequest) => {
+    return apiCall<{ message: string }>("/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  verifyEmail: (token: string) => {
+    return apiCall<{ message: string }>(`/auth/verify-email?token=${token}`);
+  },
+
+  resendVerification: (data: ResendVerificationRequest) => {
+    return apiCall<{ message: string }>("/auth/resend-verification", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  changePassword: (data: ChangePasswordRequest) => {
+    return apiCall<{ message: string }>("/auth/change-password", {
+      method: "POST",
+      body: JSON.stringify(data),
+      headers: authHeaders(),
     });
   },
 };
