@@ -110,10 +110,3 @@ user_settings_collection.create_index(
         ("updated_at", DESCENDING),
     ]
 )
-
-application_settings_collection.create_index(
-    [
-        ("_id", ASCENDING),
-    ],
-    unique=True,
-)
