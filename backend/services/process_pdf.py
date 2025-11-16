@@ -2,6 +2,16 @@ from typing import Optional
 import os
 import re
 import base64
+from pathlib import Path
+from docx import Document  # type: ignore
+
+try:
+    import pymupdf4llm as fitz  # type: ignore
+
+except ImportError:  # pragma: no cover - fallback when pymupdf4llm not available
+    import fitz  # type: ignore
+
+
 
 """
 
@@ -9,11 +19,6 @@ Utility to convert PDFs to Markdown using PyMuPDF (pymupdf / pymupdf4llm).
 Creates simple heading detection via font-size heuristics, preserves basic
 inline bold/italic from font names, detects bullets, and can extract images.
 """
-
-
-# try to support either package name
-
-import pymupdf4llm as fitz  # type: ignore
 
 
 def _sanitize_md(text: str) -> str:
@@ -53,7 +58,7 @@ def convert_pdf_to_md(pdf_path: str, images_dir: Optional[str] = None, include_i
     sizes = {}
     for page in doc:
         page_dict = page.get_text("dict")
-        for block in page_dict.get("blocks", []):
+        for block in page_dict.get("blocks", []): # type: ignore
             if block.get("type") != 0:
                 continue
             for line in block.get("lines", []):
@@ -75,7 +80,7 @@ def convert_pdf_to_md(pdf_path: str, images_dir: Optional[str] = None, include_i
         page_dict = page.get_text("dict")
 
         # Extract blocks in reading order
-        for block in page_dict.get("blocks", []):
+        for block in page_dict.get("blocks", []): # type: ignore
             btype = block.get("type")
             if btype == 0:  # text block
                 for line in block.get("lines", []):
@@ -86,6 +91,7 @@ def convert_pdf_to_md(pdf_path: str, images_dir: Optional[str] = None, include_i
 
                     # build line text by spans, preserving bold/italic heuristics
                     span_texts = []
+                    
                     for span in line.get("spans", []):
                         txt = span.get("text", "")
                         if not txt.strip():
@@ -97,6 +103,7 @@ def convert_pdf_to_md(pdf_path: str, images_dir: Optional[str] = None, include_i
                         is_italic = "italic" in fontname_lower or "oblique" in fontname_lower
                         wrapped = _wrap_emphasis(txt, is_bold, is_italic)
                         span_texts.append(wrapped)
+                    
                     raw_line = "".join(span_texts).strip()
                     raw_line = _sanitize_md(raw_line)
 
@@ -118,6 +125,7 @@ def convert_pdf_to_md(pdf_path: str, images_dir: Optional[str] = None, include_i
                 # block['image'] is a dict with xref on PyMuPDF outputs
                 imginfo = block.get("image", {})
                 xref = imginfo.get("xref")
+                
                 if xref:
                     try:
                         img_dict = doc.extract_image(xref)
@@ -128,12 +136,13 @@ def convert_pdf_to_md(pdf_path: str, images_dir: Optional[str] = None, include_i
                             img_name = f"page{pno+1}_img{xref}.{img_ext}"
                             img_path = os.path.join(images_dir, img_name)
                             with open(img_path, "wb") as f:
-                                f.write(img_bytes)
+                                f.write(img_bytes) # type: ignore
                             md_lines.append(f"![image]({img_path})")
                         else:
                             # embed as data URI (note: large PDFs -> large MD)
-                            b64 = base64.b64encode(img_bytes).decode("ascii")
+                            b64 = base64.b64encode(img_bytes).decode("ascii") # type: ignore
                             md_lines.append(f"![image](data:image/{img_ext};base64,{b64})")
+                    
                     except Exception:
                         # fallback: skip image on errors
                         continue
@@ -146,3 +155,49 @@ def convert_pdf_to_md(pdf_path: str, images_dir: Optional[str] = None, include_i
             md_lines.append("\n---\n")
 
     return "\n".join(md_lines).strip()
+
+
+def convert_docx_to_md(docx_path: str) -> str:
+
+    doc = Document(docx_path)  # type: ignore[misc]
+    md_lines = []
+
+    for para in doc.paragraphs:
+        text = para.text.strip()
+        if not text:
+            md_lines.append("")
+            continue
+
+        style_name = para.style.name if para.style else ""
+        if style_name.lower().startswith("heading"):
+            # Extract heading level digits, default to 1 if missing
+            digits = "".join(ch for ch in style_name if ch.isdigit())
+            level = max(1, min(int(digits or "1"), 6))
+            md_lines.append(f"{'#' * level} {text}")
+        
+        elif "list" in style_name.lower():
+            md_lines.append(f"- {text}")
+        
+        else:
+            md_lines.append(text)
+
+    return "\n\n".join(line for line in md_lines if line is not None).strip()
+
+
+def convert_document_to_md(path: str, **kwargs) -> str:
+    ext = Path(path).suffix.lower()
+    
+    if ext == ".pdf":
+        return convert_pdf_to_md(path, **kwargs)
+    
+    if ext == ".docx":
+        return convert_docx_to_md(path)
+    
+    raise ValueError("Unsupported file type. Only PDF and DOCX files are supported.")
+
+
+__all__ = [
+    "convert_pdf_to_md",
+    "convert_docx_to_md",
+    "convert_document_to_md",
+]
