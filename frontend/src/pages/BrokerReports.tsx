@@ -179,14 +179,22 @@ export default function BrokerReports() {
 	const savedArticlesQuery = useSavedArticles(200, 0);
 	const scrapeQuery = useScrapeArticles({ ...scrapeParams, enabled: false });
 
-	// Favorites
+	// Favorites (only available when authenticated)
 	const favoritesQuery = useListFavorites();
 	const favoritesData = favoritesQuery.data?.favorites ?? [];
 	const favoriteIds = new Set<string>(
-		(Array.isArray(favoritesData) ? favoritesData.map((f: any) => f._id || f.id || "") : [])
+		(Array.isArray(favoritesData) ? favoritesData.map((f: any) => {
+			// The backend returns ArticleInDB objects in favorites list
+			// We need to extract the _id field and convert to string
+			const id = f._id || f.id;
+			return typeof id === 'object' && id !== null ? String(id) : String(id || "");
+		}).filter(Boolean) : [])
 	);
 	const addFavoriteMutation = useAddFavorite();
 	const removeFavoriteMutation = useRemoveFavorite();
+	
+	// Check if user is authenticated
+	const isAuthenticated = typeof window !== 'undefined' && !!localStorage.getItem('auth_token');
 	const { data: savedData, isLoading: savedLoading, isPending: savedPending, isFetching: savedFetching, isError: savedError, error: savedErrorObj, refetch: refetchSaved } = savedArticlesQuery;
 	const { data: scrapeData, isLoading: scrapeLoading, isPending: scrapePending, isFetching: scrapeFetching, isError: scrapeError, error: scrapeErrorObj, refetch: refetchScrape } = scrapeQuery;
 
@@ -237,10 +245,14 @@ export default function BrokerReports() {
 				tags: tags.length ? `${tags.length} tags` : "No tags",
 			};
 
+			// Extract and normalize the database ID
+			const rawId = article._id || article.id;
+			const dbId = rawId ? (typeof rawId === 'object' ? String(rawId) : String(rawId)) : undefined;
+
 			return {
 				id: article.link || `article-${index}`,
 				title: article.title || "Untitled",
-				dbId: (article._id as string) || undefined,
+				dbId,
 				source,
 				company: source,
 				extractedAt: publishInfo.formatted,
@@ -694,6 +706,8 @@ export default function BrokerReports() {
 													variant={favoriteIds.has(report.dbId || "") ? "destructive" : "ghost"}
 													size="sm"
 													className="text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+													disabled={!report.dbId || !isAuthenticated}
+													title={!isAuthenticated ? "Sign in to favorite articles" : !report.dbId ? "Article must be saved first" : ""}
 													onClick={async (e) => {
 														e.stopPropagation();
 														if (!report.dbId) return;
@@ -748,7 +762,8 @@ export default function BrokerReports() {
 													}
 												}
 											}}
-											disabled={preparedReports.length === 0}
+											disabled={preparedReports.length === 0 || !isAuthenticated}
+											title={!isAuthenticated ? "Sign in to favorite articles" : ""}
 										>
 											<FileText className="h-4 w-4 mr-1" />
 											Favorite All

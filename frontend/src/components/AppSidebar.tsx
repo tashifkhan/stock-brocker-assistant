@@ -33,8 +33,6 @@ const mainItems = [
 	{ title: "Corporate Filings Alerts", url: "/filings-alerts", icon: Bell },
 ];
 
-const adminItems = [{ title: "Admin Dashboard", url: "/admin", icon: Shield }];
-
 const settingsItems = [{ title: "Settings", url: "/settings", icon: Settings }];
 
 export function AppSidebar() {
@@ -66,30 +64,6 @@ export function AppSidebar() {
 										className="text-black/50 hover:text-foreground"
 									>
 										<NavLink to={item.url} end className={getNavCls}>
-											<item.icon className="text-black/50 mr-2 h-4 w-4" />
-											<span className="text-black/50">{item.title}</span>
-										</NavLink>
-									</SidebarMenuButton>
-								</SidebarMenuItem>
-							))}
-						</SidebarMenu>
-					</SidebarGroupContent>
-				</SidebarGroup>
-
-				{/* Admin Section */}
-				<SidebarGroup>
-					<SidebarGroupLabel className="text-muted-foreground px-2 text-sm">
-						Administration
-					</SidebarGroupLabel>
-					<SidebarGroupContent>
-						<SidebarMenu>
-							{adminItems.map((item) => (
-								<SidebarMenuItem key={item.title}>
-									<SidebarMenuButton
-										asChild
-										className="text-black/50 hover:text-foreground"
-									>
-										<NavLink to={item.url} className={getNavCls}>
 											<item.icon className="text-black/50 mr-2 h-4 w-4" />
 											<span className="text-black/50">{item.title}</span>
 										</NavLink>

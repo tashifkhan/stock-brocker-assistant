@@ -14,6 +14,7 @@ import {
   adminApi,
   userSettingsApi,
   healthApi,
+  userApi,
   type MarketSummary,
   type FileUploadResponse,
   type AnalysisResult,
@@ -127,11 +128,14 @@ export function useSavedArticles(limit: number = 50, skip: number = 0) {
 
 // ============ USER FAVORITES HOOKS ============
 export function useListFavorites() {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
   return useQuery({
     queryKey: ["user", "favorites"],
     queryFn: () => userApi.listFavorites(),
+    enabled: !!token, // Only fetch if authenticated
     staleTime: 2 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
+    retry: false, // Don't retry on auth errors
   });
 }
 

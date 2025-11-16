@@ -12,7 +12,6 @@ import Editorial from "./pages/Editorial";
 import BrokerReports from "./pages/BrokerReports";
 import MarketSummary from "./pages/MarketSummary";
 import FilingsAlerts from "./pages/FilingsAlerts";
-import AdminDashboard from "./pages/AdminDashboard";
 import Settings from "./pages/Settings";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -85,14 +84,6 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <FilingsAlerts />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin"
-                element={
-                  <ProtectedRoute requireAdmin>
-                    <AdminDashboard />
                   </ProtectedRoute>
                 }
               />
