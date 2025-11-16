@@ -305,13 +305,13 @@ export const reportAnalysisApi = {
 // ============ FILINGS API ============
 
 export const filingsApi = {
-  getUSFilings: (count: number = 10) => {
+  getUSFilings: (count: number = 90) => {
     return apiCall<{ results: Filing[]; [key: string]: any }>(
       `/market-filling/us?count=${count}`
     );
   },
 
-  getIndiaFilings: (count: number = 10) => {
+  getIndiaFilings: (count: number = 90) => {
     return apiCall<{ results: Filing[]; [key: string]: any }>(
       `/market-filling/india?count=${count}`
     );

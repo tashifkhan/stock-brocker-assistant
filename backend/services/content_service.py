@@ -81,19 +81,19 @@ async def save_market_filings(source: str, filings: List[dict]) -> None:
     now = datetime.utcnow()
 
     async def _upsert(filing: dict):
+        link = (filing.get("link") or "").strip()
+        if not link:
+            return
+
         meta = {k: v for k, v in filing.items() if k not in {"title", "link"}}
         await asyncio.to_thread(
             market_filings_collection.update_one,
-            {
-                "source": source,
-                "link": filing.get("link"),
-                "title": filing.get("title"),
-            },
+            {"source": source, "link": link},
             {
                 "$set": {
                     "source": source,
                     "title": filing.get("title", ""),
-                    "link": filing.get("link", ""),
+                    "link": link,
                     "meta": meta,
                     "updated_at": now,
                 },

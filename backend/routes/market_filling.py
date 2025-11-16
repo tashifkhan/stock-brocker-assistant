@@ -26,7 +26,7 @@ class EmailRequest(BaseModel):
 
 
 @router.get("/us")
-async def get_us_filings(count: int = Query(10, ge=1, le=100)) -> Dict[str, object]:
+async def get_us_filings(count: int = Query(90, ge=1, le=100)) -> Dict[str, object]:
     """Return recent US filings from the SEC feed.
 
     Query param:
@@ -52,7 +52,7 @@ async def get_us_filings(count: int = Query(10, ge=1, le=100)) -> Dict[str, obje
 
 
 @router.get("/india")
-async def get_india_filings(count: int = Query(10, ge=1, le=100)) -> Dict[str, object]:
+async def get_india_filings(count: int = Query(90, ge=1, le=100)) -> Dict[str, object]:
     """Return recent India filings/announcements from SEBI.
 
     Query param:
@@ -79,7 +79,7 @@ async def get_india_filings(count: int = Query(10, ge=1, le=100)) -> Dict[str, o
 
 @router.post("/us/email")
 async def send_us_filings_email(
-    email_request: EmailRequest, count: int = Query(10, ge=1, le=100)
+    email_request: EmailRequest, count: int = Query(90, ge=1, le=100)
 ) -> Dict[str, object]:
     """Fetch recent US SEC filings and send them via email.
 
@@ -153,7 +153,7 @@ async def send_us_filings_email(
 
 @router.post("/india/email")
 async def send_india_filings_email(
-    email_request: EmailRequest, count: int = Query(10, ge=1, le=100)
+    email_request: EmailRequest, count: int = Query(90, ge=1, le=100)
 ) -> Dict[str, object]:
     """Fetch recent India SEBI filings and send them via email.
 
