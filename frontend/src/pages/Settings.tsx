@@ -1,9 +1,11 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { 
   Settings as SettingsIcon, 
   User, 
@@ -11,10 +13,72 @@ import {
   Shield, 
   Palette,
   Save,
-  Upload
-} from "lucide-react"
+  Upload,
+  Loader2,
+  CheckCircle2
+} from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { authApi } from "@/lib/api";
 
 export default function Settings() {
+  const { user } = useAuth();
+  const [passwordForm, setPasswordForm] = useState({
+    old_password: "",
+    new_password: "",
+    confirmPassword: "",
+  });
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
+
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError("");
+    setPasswordSuccess(false);
+
+    if (passwordForm.new_password !== passwordForm.confirmPassword) {
+      setPasswordError("New passwords do not match");
+      return;
+    }
+
+    if (passwordForm.new_password.length < 8) {
+      setPasswordError("Password must be at least 8 characters long");
+      return;
+    }
+
+    if (passwordForm.new_password.length > 72) {
+      setPasswordError("Password cannot be longer than 72 characters");
+      return;
+    }
+
+    setIsChangingPassword(true);
+
+    try {
+      await authApi.changePassword({
+        old_password: passwordForm.old_password,
+        new_password: passwordForm.new_password,
+      });
+      setPasswordSuccess(true);
+      setPasswordForm({
+        old_password: "",
+        new_password: "",
+        confirmPassword: "",
+      });
+    } catch (err: any) {
+      setPasswordError(err.message || "Failed to change password");
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -48,8 +112,9 @@ export default function Settings() {
               {/* Avatar */}
               <div className="flex items-center space-x-4">
                 <Avatar className="h-20 w-20">
-                  <AvatarImage src="/placeholder.svg" />
-                  <AvatarFallback className="text-lg">JD</AvatarFallback>
+                  <AvatarFallback className="text-lg">
+                    {user ? getInitials(user.username) : "U"}
+                  </AvatarFallback>
                 </Avatar>
                 <div>
                   <Button variant="outline" size="sm">
@@ -65,28 +130,28 @@ export default function Settings() {
               {/* Form Fields */}
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="firstName">First Name</Label>
-                  <Input id="firstName" defaultValue="Abcd" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lastName">Last Name</Label>
-                  <Input id="lastName" defaultValue="Doe" />
+                  <Label htmlFor="username">Username</Label>
+                  <Input id="username" defaultValue={user?.username || ""} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" defaultValue="abcd.efgh@company.com" />
+                  <Input 
+                    id="email" 
+                    type="email" 
+                    defaultValue={user?.email || ""} 
+                    disabled
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Email cannot be changed
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="phone">Phone</Label>
-                  <Input id="phone" defaultValue="+91 (555) 123-4567" />
+                  <Input id="phone" defaultValue="" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="company">Company</Label>
-                  <Input id="company" defaultValue="Financial Corp" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="department">Department</Label>
-                  <Input id="department" defaultValue="Investment Research" />
+                  <Input id="company" defaultValue="" />
                 </div>
               </div>
 
@@ -96,7 +161,7 @@ export default function Settings() {
                   id="bio" 
                   className="w-full p-3 border rounded-md resize-none"
                   rows={3}
-                  defaultValue="Senior Financial Analyst with 8+ years of experience in investment research and market analysis."
+                  defaultValue=""
                 />
               </div>
 
@@ -204,21 +269,64 @@ export default function Settings() {
               <div className="space-y-4">
                 <div>
                   <h3 className="font-medium mb-3">Change Password</h3>
-                  <div className="space-y-3">
+                  {passwordSuccess && (
+                    <Alert className="mb-4 bg-green-50 border-green-200">
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      <AlertDescription className="text-green-800">
+                        Password changed successfully!
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  {passwordError && (
+                    <Alert variant="destructive" className="mb-4">
+                      <AlertDescription>{passwordError}</AlertDescription>
+                    </Alert>
+                  )}
+                  <form onSubmit={handlePasswordChange} className="space-y-3">
                     <div className="space-y-2">
                       <Label htmlFor="currentPassword">Current Password</Label>
-                      <Input id="currentPassword" type="password" />
+                      <Input 
+                        id="currentPassword" 
+                        type="password"
+                        value={passwordForm.old_password}
+                        onChange={(e) => setPasswordForm({...passwordForm, old_password: e.target.value})}
+                        required
+                        disabled={isChangingPassword}
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="newPassword">New Password</Label>
-                      <Input id="newPassword" type="password" />
+                      <Input 
+                        id="newPassword" 
+                        type="password"
+                        value={passwordForm.new_password}
+                        onChange={(e) => setPasswordForm({...passwordForm, new_password: e.target.value})}
+                        required
+                        disabled={isChangingPassword}
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                      <Input id="confirmPassword" type="password" />
+                      <Input 
+                        id="confirmPassword" 
+                        type="password"
+                        value={passwordForm.confirmPassword}
+                        onChange={(e) => setPasswordForm({...passwordForm, confirmPassword: e.target.value})}
+                        required
+                        disabled={isChangingPassword}
+                      />
                     </div>
-                    <Button size="sm">Update Password</Button>
-                  </div>
+                    <Button type="submit" size="sm" disabled={isChangingPassword}>
+                      {isChangingPassword ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Updating...
+                        </>
+                      ) : (
+                        "Update Password"
+                      )}
+                    </Button>
+                  </form>
                 </div>
 
                 <div className="pt-4 border-t">
