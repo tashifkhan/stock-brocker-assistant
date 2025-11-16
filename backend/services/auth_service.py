@@ -4,9 +4,9 @@ import secrets
 from datetime import datetime, timedelta
 from typing import Optional
 
+import bcrypt
 from dotenv import load_dotenv
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 
 from models.user import UserCreate, UserInDB
 from services.database import users_collection
@@ -16,18 +16,44 @@ load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY", secrets.token_urlsafe(32))
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
+MAX_PASSWORD_BYTES = 72
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def _password_to_bytes(password: str) -> bytes:
+    password_bytes = password.encode("utf-8")
+    if len(password_bytes) > MAX_PASSWORD_BYTES:
+        raise ValueError(
+            "password cannot be longer than 72 bytes, truncate manually if necessary (e.g. my_password[:72])"
+        )
+    return password_bytes
 
 
 class AuthService:
     @staticmethod
     def verify_password(plain_password: str, hashed_password: str) -> bool:
-        return pwd_context.verify(plain_password, hashed_password)
+        try:
+            plain_bytes = _password_to_bytes(plain_password)
+        except ValueError:
+            # Treat overly long passwords as invalid credentials during verification.
+            return False
+
+        hashed_bytes = (
+            hashed_password
+            if isinstance(hashed_password, bytes)
+            else hashed_password.encode("utf-8")
+        )
+
+        try:
+            return bcrypt.checkpw(plain_bytes, hashed_bytes)
+        except ValueError:
+            # If the stored hash is malformed, fail the check without crashing.
+            return False
 
     @staticmethod
     def get_password_hash(password: str) -> str:
-        return pwd_context.hash(password)
+        password_bytes = _password_to_bytes(password)
+        hashed = bcrypt.hashpw(password_bytes, bcrypt.gensalt())
+        return hashed.decode("utf-8")
 
     @staticmethod
     def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):

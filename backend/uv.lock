@@ -39,6 +39,7 @@ name = "backend"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "bcrypt" },
     { name = "bs4" },
     { name = "docx" },
     { name = "fastapi" },
@@ -63,6 +64,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "bcrypt", specifier = ">=5.0.0" },
     { name = "bs4", specifier = ">=0.0.2" },
     { name = "docx", specifier = ">=0.2.4" },
     { name = "fastapi", specifier = ">=0.121.0" },
