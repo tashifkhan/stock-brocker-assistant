@@ -124,12 +124,35 @@ export interface SystemMetrics {
   total_requests: number;
 }
 
+export interface AppSettings {
+  _id?: string;
+  app_name: string;
+  version: string;
+  debug_mode: boolean;
+  cache_enabled: boolean;
+  log_level: string;
+  max_upload_size_mb: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export type AppSettingsUpdate = Partial<
+  Pick<
+    AppSettings,
+    "app_name" | "version" | "debug_mode" | "cache_enabled" | "log_level" | "max_upload_size_mb"
+  >
+>;
+
 export interface UserSettings {
+  _id?: string;
+  user_id?: string;
   theme: string;
   notifications_enabled: boolean;
   email_digest_frequency: string;
   language: string;
   timezone?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 /**
@@ -377,16 +400,37 @@ export const adminApi = {
   },
 
   getSettings: () => {
-    return apiCall<{ settings: Record<string, any>; status: string }>(
+    return apiCall<{ settings: AppSettings; status: string }>(
       "/admin/settings"
     );
   },
 
-  updateSettings: (key: string, value: any) => {
-    return apiCall<any>("/admin/settings", {
-      method: "POST",
-      body: JSON.stringify({ key, value }),
-    });
+  updateSettings: (payload: AppSettingsUpdate) => {
+    return apiCall<{ settings: AppSettings; status: string; message?: string }>(
+      "/admin/settings",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }
+    );
+  },
+
+  getUserSettings: (userId?: string) => {
+    const query = userId ? `?user_id=${encodeURIComponent(userId)}` : "";
+    return apiCall<{ settings: UserSettings; status: string }>(
+      `/admin/settings/user${query}`
+    );
+  },
+
+  updateUserSettings: (settings: Partial<UserSettings>, userId?: string) => {
+    const query = userId ? `?user_id=${encodeURIComponent(userId)}` : "";
+    return apiCall<{ settings: UserSettings; status: string; message?: string }>(
+      `/admin/settings/user${query}`,
+      {
+        method: "POST",
+        body: JSON.stringify(settings),
+      }
+    );
   },
 
   getUsers: (limit: number = 10, offset: number = 0) => {
@@ -403,17 +447,22 @@ export const adminApi = {
 // ============ USER SETTINGS API ============
 
 export const userSettingsApi = {
-  getSettings: () => {
+  getSettings: (userId?: string) => {
+    const query = userId ? `?user_id=${encodeURIComponent(userId)}` : "";
     return apiCall<{ settings: UserSettings; status: string }>(
-      "/admin/settings/user"
+      `/admin/settings/user${query}`
     );
   },
 
-  updateSettings: (settings: Partial<UserSettings>) => {
-    return apiCall<any>("/admin/settings/user", {
-      method: "POST",
-      body: JSON.stringify(settings),
-    });
+  updateSettings: (settings: Partial<UserSettings>, userId?: string) => {
+    const query = userId ? `?user_id=${encodeURIComponent(userId)}` : "";
+    return apiCall<{ settings: UserSettings; status: string; message?: string }>(
+      `/admin/settings/user${query}`,
+      {
+        method: "POST",
+        body: JSON.stringify(settings),
+      }
+    );
   },
 };
 

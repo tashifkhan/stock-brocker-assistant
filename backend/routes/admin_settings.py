@@ -87,7 +87,7 @@ async def get_application_settings(
             extra={"requested_by": _user_id_str(current_user)},
         )
         return {
-            "settings": settings.model_dump(by_alias=True),
+            "settings": settings.model_dump(by_alias=True, mode="json"),
             "status": "success",
         }
     except HTTPException:
@@ -124,7 +124,7 @@ async def update_application_settings(
             },
         )
         return {
-            "settings": updated.model_dump(by_alias=True),
+            "settings": updated.model_dump(by_alias=True, mode="json"),
             "status": "success",
             "message": "Settings updated successfully",
         }
@@ -244,7 +244,7 @@ async def get_user_settings(
             },
         )
         return {
-            "settings": settings.model_dump(by_alias=True),
+            "settings": settings.model_dump(by_alias=True, mode="json"),
             "status": "success",
         }
     except HTTPException:
@@ -288,7 +288,7 @@ async def update_user_settings(
             },
         )
         return {
-            "settings": updated.model_dump(by_alias=True),
+            "settings": updated.model_dump(by_alias=True, mode="json"),
             "status": "success",
             "message": "Settings updated successfully",
         }
