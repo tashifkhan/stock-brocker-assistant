@@ -1,16 +1,18 @@
-from typing import Optional
+import base64
 import os
 import re
-import base64
 from pathlib import Path
-from docx import Document  # type: ignore
+from typing import Any, Dict, List, Optional
+
+try:
+    from docx import Document  # type: ignore
+except ImportError:  # pragma: no cover - optional dependency
+    Document = None  # type: ignore
 
 try:
     import pymupdf4llm as fitz  # type: ignore
-
 except ImportError:  # pragma: no cover - fallback when pymupdf4llm not available
     import fitz  # type: ignore
-
 
 
 """
@@ -40,7 +42,9 @@ def _wrap_emphasis(text: str, is_bold: bool, is_italic: bool) -> str:
     return text
 
 
-def convert_pdf_to_md(pdf_path: str, images_dir: Optional[str] = None, include_images: bool = True) -> str:
+def convert_pdf_to_md(
+    pdf_path: str, images_dir: Optional[str] = None, include_images: bool = True
+) -> str:
     """
     Convert a PDF to a Markdown string.
 
@@ -52,113 +56,147 @@ def convert_pdf_to_md(pdf_path: str, images_dir: Optional[str] = None, include_i
     Returns:
         Markdown text as a single string.
     """
-    doc = fitz.open(pdf_path) # type: ignore
-
-    # Gather font sizes to build heading heuristics
-    sizes = {}
-    for page in doc:
-        page_dict = page.get_text("dict")
-        for block in page_dict.get("blocks", []): # type: ignore
-            if block.get("type") != 0:
+    doc: Any = fitz.open(pdf_path)  # type: ignore
+    try:
+        sizes: Dict[float, int] = {}
+        for page_index in range(doc.page_count):
+            page: Any = doc.load_page(page_index)
+            page_dict: Any = page.get_text("dict")
+            if not isinstance(page_dict, dict):
                 continue
-            for line in block.get("lines", []):
-                for span in line.get("spans", []):
-                    sz = round(float(span.get("size", 0)), 2)
-                    sizes[sz] = sizes.get(sz, 0) + 1
-
-    # sort sizes by frequency * size to prefer commonly used large fonts as headings
-    unique_sizes = sorted(sizes.keys(), reverse=True)
-    # map the top sizes to heading levels (largest -> h1, next -> h2, next -> h3)
-    size_to_heading = {}
-    for idx, sz in enumerate(unique_sizes[:3]):  # only top 3 sizes become headings
-        size_to_heading[sz] = idx + 1
-
-    md_lines = []
-    total_pages = doc.page_count
-    for pno in range(total_pages):
-        page = doc.load_page(pno)
-        page_dict = page.get_text("dict")
-
-        # Extract blocks in reading order
-        for block in page_dict.get("blocks", []): # type: ignore
-            btype = block.get("type")
-            if btype == 0:  # text block
-                for line in block.get("lines", []):
-                    # determine dominant font size in the line
-                    line_sizes = [round(float(s.get("size", 0)), 2) for s in line.get("spans", []) if s.get("text")]
-                    dominant_size = max(line_sizes) if line_sizes else 0
-                    heading_level = size_to_heading.get(dominant_size, 0)
-
-                    # build line text by spans, preserving bold/italic heuristics
-                    span_texts = []
-                    
-                    for span in line.get("spans", []):
-                        txt = span.get("text", "")
-                        if not txt.strip():
-                            span_texts.append(txt)
+            blocks: Any = page_dict.get("blocks", [])
+            if not isinstance(blocks, list):
+                continue
+            for block in blocks:
+                if not isinstance(block, dict) or block.get("type") != 0:
+                    continue
+                lines: Any = block.get("lines", [])
+                if not isinstance(lines, list):
+                    continue
+                for line in lines:
+                    spans: Any = line.get("spans", [])
+                    if not isinstance(spans, list):
+                        continue
+                    for span in spans:
+                        if not isinstance(span, dict):
                             continue
-                        fontname = span.get("font", "") or ""
-                        fontname_lower = fontname.lower()
-                        is_bold = "bold" in fontname_lower or "black" in fontname_lower
-                        is_italic = "italic" in fontname_lower or "oblique" in fontname_lower
-                        wrapped = _wrap_emphasis(txt, is_bold, is_italic)
-                        span_texts.append(wrapped)
-                    
-                    raw_line = "".join(span_texts).strip()
-                    raw_line = _sanitize_md(raw_line)
+                        sz = round(float(span.get("size", 0) or 0), 2)
+                        sizes[sz] = sizes.get(sz, 0) + 1
 
-                    if not raw_line:
+        unique_sizes = sorted(sizes.keys(), reverse=True)
+        size_to_heading: Dict[float, int] = {
+            sz: idx + 1 for idx, sz in enumerate(unique_sizes[:3])
+        }
+
+        md_lines: List[str] = []
+        total_pages = doc.page_count
+        for page_number in range(total_pages):
+            page = doc.load_page(page_number)
+            page_dict = page.get_text("dict")
+            if not isinstance(page_dict, dict):
+                continue
+            blocks = page_dict.get("blocks", [])
+            if not isinstance(blocks, list):
+                continue
+
+            for block in blocks:
+                if not isinstance(block, dict):
+                    continue
+                block_type = block.get("type")
+                if block_type == 0:
+                    lines = block.get("lines", [])
+                    if not isinstance(lines, list):
                         continue
+                    for line in lines:
+                        spans = line.get("spans", [])
+                        if not isinstance(spans, list):
+                            continue
 
-                    # bullet detection: common bullet characters or leading dash/star
-                    if re.match(r"^[\u2022\u2023\u25E6\u2043\-\*\o]\s+", raw_line):
-                        md_lines.append(f"- {re.sub(r'^[\u2022\u2023\u25E6\u2043\-\*\o]\s+', '', raw_line)}")
+                        line_sizes = [
+                            round(float(span.get("size", 0) or 0), 2)
+                            for span in spans
+                            if isinstance(span, dict) and span.get("text")
+                        ]
+                        dominant_size = max(line_sizes) if line_sizes else 0
+                        heading_level = size_to_heading.get(dominant_size, 0)
+
+                        span_texts: List[str] = []
+                        for span in spans:
+                            if not isinstance(span, dict):
+                                continue
+                            text = span.get("text", "") or ""
+                            if not text.strip():
+                                span_texts.append(text)
+                                continue
+                            fontname = span.get("font", "") or ""
+                            fontname_lower = fontname.lower()
+                            is_bold = (
+                                "bold" in fontname_lower or "black" in fontname_lower
+                            )
+                            is_italic = (
+                                "italic" in fontname_lower
+                                or "oblique" in fontname_lower
+                            )
+                            span_texts.append(_wrap_emphasis(text, is_bold, is_italic))
+
+                        raw_line = _sanitize_md("".join(span_texts).strip())
+                        if not raw_line:
+                            continue
+
+                        if re.match(r"^[\u2022\u2023\u25E6\u2043\-\*\o]\s+", raw_line):
+                            bullet_text = re.sub(
+                                r"^[\u2022\u2023\u25E6\u2043\-\*\o]\s+", "", raw_line
+                            )
+                            md_lines.append(f"- {bullet_text}")
+                            continue
+
+                        if heading_level:
+                            md_lines.append(f"{'#' * heading_level} {raw_line}")
+                        else:
+                            md_lines.append(raw_line)
+
+                elif block_type == 1 and include_images:
+                    imginfo = (
+                        block.get("image", {})
+                        if isinstance(block.get("image", {}), dict)
+                        else {}
+                    )
+                    xref = imginfo.get("xref")
+                    if not xref:
                         continue
-
-                    if heading_level:
-                        # heading_level 1..3 mapped to '#', '##', '###'
-                        md_lines.append(f"{'#' * heading_level} {raw_line}")
-                    else:
-                        md_lines.append(raw_line)
-
-            elif btype == 1 and include_images:  # image block
-                # block['image'] is a dict with xref on PyMuPDF outputs
-                imginfo = block.get("image", {})
-                xref = imginfo.get("xref")
-                
-                if xref:
                     try:
                         img_dict = doc.extract_image(xref)
                         img_bytes = img_dict.get("image")
+                        if not isinstance(img_bytes, (bytes, bytearray)):
+                            continue
+                        img_data = bytes(img_bytes)
                         img_ext = img_dict.get("ext", "png")
                         if images_dir:
                             os.makedirs(images_dir, exist_ok=True)
-                            img_name = f"page{pno+1}_img{xref}.{img_ext}"
+                            img_name = f"page{page_number + 1}_img{xref}.{img_ext}"
                             img_path = os.path.join(images_dir, img_name)
                             with open(img_path, "wb") as f:
-                                f.write(img_bytes) # type: ignore
+                                f.write(img_data)
                             md_lines.append(f"![image]({img_path})")
                         else:
-                            # embed as data URI (note: large PDFs -> large MD)
-                            b64 = base64.b64encode(img_bytes).decode("ascii") # type: ignore
-                            md_lines.append(f"![image](data:image/{img_ext};base64,{b64})")
-                    
+                            b64 = base64.b64encode(img_data).decode("ascii")
+                            md_lines.append(
+                                f"![image](data:image/{img_ext};base64,{b64})"
+                            )
                     except Exception:
-                        # fallback: skip image on errors
                         continue
-            else:
-                # other block types (e.g., drawings) are ignored
-                continue
 
-        # page break marker
-        if pno != total_pages - 1:
-            md_lines.append("\n---\n")
+            if page_number != total_pages - 1:
+                md_lines.append("\n---\n")
 
-    return "\n".join(md_lines).strip()
+        return "\n".join(md_lines).strip()
+    finally:
+        doc.close()
 
 
 def convert_docx_to_md(docx_path: str) -> str:
-
+    if Document is None:
+        raise ImportError("python-docx is required to process DOCX files.")
     doc = Document(docx_path)  # type: ignore[misc]
     md_lines = []
 
@@ -174,10 +212,10 @@ def convert_docx_to_md(docx_path: str) -> str:
             digits = "".join(ch for ch in style_name if ch.isdigit())
             level = max(1, min(int(digits or "1"), 6))
             md_lines.append(f"{'#' * level} {text}")
-        
+
         elif "list" in style_name.lower():
             md_lines.append(f"- {text}")
-        
+
         else:
             md_lines.append(text)
 
@@ -186,13 +224,13 @@ def convert_docx_to_md(docx_path: str) -> str:
 
 def convert_document_to_md(path: str, **kwargs) -> str:
     ext = Path(path).suffix.lower()
-    
+
     if ext == ".pdf":
         return convert_pdf_to_md(path, **kwargs)
-    
+
     if ext == ".docx":
         return convert_docx_to_md(path)
-    
+
     raise ValueError("Unsupported file type. Only PDF and DOCX files are supported.")
 
 
