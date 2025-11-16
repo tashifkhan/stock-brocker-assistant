@@ -1,259 +1,299 @@
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
-from typing import Optional, Dict, Any
+import logging
+from typing import Any, Dict, Optional
+
+from bson import ObjectId
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from models.admin import AdminLogCreate, AppSettingsUpdate, UserSettingsUpdate
+from models.user import UserInDB
+from routes.auth import get_current_active_user
+from services.admin_service import AdminService
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
-class SystemMetrics(BaseModel):
-    uptime_hours: float
-    memory_usage_percent: float
-    cpu_usage_percent: float
-    disk_usage_percent: float
-    active_users: int
-    total_requests: int
+logger = logging.getLogger("stock_broker_admin")
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    handler.setFormatter(
+        logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    )
+    logger.addHandler(handler)
+logger.setLevel(logging.INFO)
+logger.propagate = False
 
 
-class AppSettings(BaseModel):
-    app_name: str
-    version: str
-    debug_mode: bool
-    cache_enabled: bool
-    log_level: str
-    max_upload_size_mb: int
+def _user_id_str(user: UserInDB) -> Optional[str]:
+    identifier = getattr(user, "id", None)
+    return str(identifier) if identifier is not None else None
 
 
-class SettingsUpdateRequest(BaseModel):
-    key: str
-    value: Any
+async def _resolve_user_id(
+    provided_id: Optional[str], current_user: UserInDB
+) -> ObjectId:
+    target_id = provided_id or _user_id_str(current_user)
+    if not target_id:
+        raise HTTPException(status_code=400, detail="User ID is required")
+    if not ObjectId.is_valid(target_id):
+        raise HTTPException(status_code=400, detail="Invalid user_id")
+    return ObjectId(target_id)
 
 
 @router.get("/metrics")
-def get_system_metrics() -> Dict[str, Any]:
-    """
-    Get system health and performance metrics.
-
-    Returns:
-        Dictionary with system metrics
-    """
+async def get_system_metrics(
+    current_user: UserInDB = Depends(get_current_active_user),
+) -> Dict[str, Any]:
     try:
-        metrics = SystemMetrics(
-            uptime_hours=24.5,
-            memory_usage_percent=45.2,
-            cpu_usage_percent=12.8,
-            disk_usage_percent=62.3,
-            active_users=5,
-            total_requests=15230,
+        metrics = await AdminService.get_system_metrics()
+        await AdminService.log_event(
+            AdminLogCreate(
+                level="INFO",
+                message="Fetched system metrics",
+                source="routes.admin_settings.get_system_metrics",
+                metadata={"requested_by": _user_id_str(current_user)},
+            )
         )
-
+        logger.info(
+            "Fetched system metrics",
+            extra={"requested_by": _user_id_str(current_user)},
+        )
         return {
             "metrics": metrics.model_dump(),
             "status": "success",
         }
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Failed to fetch system metrics")
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @router.get("/settings")
-def get_application_settings() -> Dict[str, Any]:
-    """
-    Get current application settings.
-
-    Returns:
-        Dictionary with application settings
-    """
+async def get_application_settings(
+    current_user: UserInDB = Depends(get_current_active_user),
+) -> Dict[str, Any]:
     try:
-        settings = AppSettings(
-            app_name="Stock Broker Assistant",
-            version="0.1.0",
-            debug_mode=False,
-            cache_enabled=True,
-            log_level="INFO",
-            max_upload_size_mb=50,
+        settings = await AdminService.get_application_settings()
+        await AdminService.log_event(
+            AdminLogCreate(
+                level="INFO",
+                message="Fetched application settings",
+                source="routes.admin_settings.get_application_settings",
+                metadata={"requested_by": _user_id_str(current_user)},
+            )
         )
-
+        logger.info(
+            "Fetched application settings",
+            extra={"requested_by": _user_id_str(current_user)},
+        )
         return {
-            "settings": settings.model_dump(),
+            "settings": settings.model_dump(by_alias=True),
             "status": "success",
         }
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Failed to fetch application settings")
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @router.post("/settings")
-def update_application_settings(request: SettingsUpdateRequest) -> Dict[str, Any]:
-    """
-    Update application settings.
-
-    Args:
-        request: Contains the key and new value for a setting
-
-    Returns:
-        Dictionary with updated settings
-    """
+async def update_application_settings(
+    payload: AppSettingsUpdate,
+    current_user: UserInDB = Depends(get_current_active_user),
+) -> Dict[str, Any]:
     try:
-        # Placeholder for settings update logic
-        # In production, persist to database or config file
-        updated_value = request.value
-
+        updated = await AdminService.update_application_settings(payload)
+        changes = payload.model_dump(exclude_unset=True)
+        await AdminService.log_event(
+            AdminLogCreate(
+                level="INFO",
+                message="Updated application settings",
+                source="routes.admin_settings.update_application_settings",
+                metadata={
+                    "requested_by": _user_id_str(current_user),
+                    "updated_fields": list(changes.keys()),
+                },
+            )
+        )
+        logger.info(
+            "Updated application settings",
+            extra={
+                "requested_by": _user_id_str(current_user),
+                "fields": list(changes.keys()),
+            },
+        )
         return {
-            "key": request.key,
-            "value": updated_value,
+            "settings": updated.model_dump(by_alias=True),
             "status": "success",
-            "message": f"Successfully updated {request.key}",
+            "message": "Settings updated successfully",
         }
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Failed to update application settings")
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @router.get("/users")
-def list_users(limit: int = 10, offset: int = 0) -> Dict[str, Any]:
-    """
-    List all application users.
-
-    Args:
-        limit: Maximum number of users to return
-        offset: Pagination offset
-
-    Returns:
-        Dictionary with list of users
-    """
+async def list_users(
+    limit: int = Query(10, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    current_user: UserInDB = Depends(get_current_active_user),
+) -> Dict[str, Any]:
     try:
-        # Placeholder for users list
-        users = [
-            {
-                "id": 1,
-                "username": "admin",
-                "email": "admin@example.com",
-                "role": "admin",
-                "created_at": "2024-01-01T00:00:00",
+        total, users = await AdminService.list_users(limit=limit, offset=offset)
+        payload = [user.model_dump(by_alias=True) for user in users]
+        await AdminService.log_event(
+            AdminLogCreate(
+                level="INFO",
+                message="Listed users",
+                source="routes.admin_settings.list_users",
+                metadata={
+                    "requested_by": _user_id_str(current_user),
+                    "limit": limit,
+                    "offset": offset,
+                },
+            )
+        )
+        logger.info(
+            "Listed users",
+            extra={
+                "requested_by": _user_id_str(current_user),
+                "count": len(payload),
             },
-            {
-                "id": 2,
-                "username": "user1",
-                "email": "user1@example.com",
-                "role": "analyst",
-                "created_at": "2024-01-05T00:00:00",
-            },
-        ]
-
+        )
         return {
-            "users": users,
-            "total": len(users),
+            "users": payload,
+            "total": total,
             "limit": limit,
             "offset": offset,
             "status": "success",
         }
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Failed to list users")
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @router.get("/logs")
-def get_application_logs(limit: int = 100) -> Dict[str, Any]:
-    """
-    Get recent application logs.
-
-    Args:
-        limit: Maximum number of log entries to return
-
-    Returns:
-        Dictionary with recent logs
-    """
+async def get_application_logs(
+    limit: int = Query(100, ge=1, le=500),
+    level: Optional[str] = Query(None, description="Optional log level filter"),
+    current_user: UserInDB = Depends(get_current_active_user),
+) -> Dict[str, Any]:
     try:
-        # Placeholder for logs
-        logs = [
-            {
-                "timestamp": "2024-11-08T10:00:00",
-                "level": "INFO",
-                "message": "Application started",
-                "source": "main.py",
+        logs = await AdminService.list_logs(limit=limit, level=level)
+        payload = [log.model_dump(by_alias=True) for log in logs]
+        await AdminService.log_event(
+            AdminLogCreate(
+                level="INFO",
+                message="Viewed application logs",
+                source="routes.admin_settings.get_application_logs",
+                metadata={
+                    "requested_by": _user_id_str(current_user),
+                    "limit": limit,
+                    "level": level.upper() if level else None,
+                },
+            )
+        )
+        logger.info(
+            "Fetched application logs",
+            extra={
+                "requested_by": _user_id_str(current_user),
+                "count": len(payload),
             },
-            {
-                "timestamp": "2024-11-08T10:01:00",
-                "level": "INFO",
-                "message": "API request to /articles/scrape",
-                "source": "article_scrapper.py",
-            },
-            {
-                "timestamp": "2024-11-08T10:02:00",
-                "level": "WARNING",
-                "message": "High memory usage detected",
-                "source": "system.py",
-            },
-        ]
-
+        )
         return {
-            "logs": logs[:limit],
-            "total": len(logs),
+            "logs": payload,
+            "total": len(payload),
             "status": "success",
         }
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# Settings routes
-class SettingsRequest(BaseModel):
-    theme: Optional[str] = None
-    notifications_enabled: Optional[bool] = None
-    email_digest_frequency: Optional[str] = None
-    language: Optional[str] = None
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Failed to fetch application logs")
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @router.get("/settings/user")
-def get_user_settings() -> Dict[str, Any]:
-    """
-    Get current user's settings and preferences.
-
-    Returns:
-        Dictionary with user settings
-    """
+async def get_user_settings(
+    user_id: Optional[str] = Query(None),
+    current_user: UserInDB = Depends(get_current_active_user),
+) -> Dict[str, Any]:
     try:
-        settings = {
-            "theme": "dark",
-            "notifications_enabled": True,
-            "email_digest_frequency": "daily",
-            "language": "en",
-            "timezone": "UTC",
-        }
-
+        target_id = await _resolve_user_id(user_id, current_user)
+        settings = await AdminService.get_user_settings(target_id)
+        await AdminService.log_event(
+            AdminLogCreate(
+                level="INFO",
+                message="Fetched user settings",
+                source="routes.admin_settings.get_user_settings",
+                metadata={
+                    "requested_by": _user_id_str(current_user),
+                    "target_user_id": str(target_id),
+                },
+            )
+        )
+        logger.info(
+            "Fetched user settings",
+            extra={
+                "requested_by": _user_id_str(current_user),
+                "target_user_id": str(target_id),
+            },
+        )
         return {
-            "settings": settings,
+            "settings": settings.model_dump(by_alias=True),
             "status": "success",
         }
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Failed to fetch user settings")
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @router.post("/settings/user")
-def update_user_settings(request: SettingsRequest) -> Dict[str, Any]:
-    """
-    Update user settings and preferences.
-
-    Args:
-        request: Settings to update
-
-    Returns:
-        Dictionary with updated settings
-    """
+async def update_user_settings(
+    payload: UserSettingsUpdate,
+    user_id: Optional[str] = Query(None),
+    current_user: UserInDB = Depends(get_current_active_user),
+) -> Dict[str, Any]:
     try:
-        updated_settings = {
-            "theme": request.theme or "dark",
-            "notifications_enabled": request.notifications_enabled if request.notifications_enabled is not None else True,
-            "email_digest_frequency": request.email_digest_frequency or "daily",
-            "language": request.language or "en",
-        }
+        changes = payload.model_dump(exclude_unset=True)
+        if not changes:
+            raise HTTPException(status_code=400, detail="No settings provided")
 
+        target_id = await _resolve_user_id(user_id, current_user)
+        updated = await AdminService.update_user_settings(target_id, payload)
+        await AdminService.log_event(
+            AdminLogCreate(
+                level="INFO",
+                message="Updated user settings",
+                source="routes.admin_settings.update_user_settings",
+                metadata={
+                    "requested_by": _user_id_str(current_user),
+                    "target_user_id": str(target_id),
+                    "updated_fields": list(changes.keys()),
+                },
+            )
+        )
+        logger.info(
+            "Updated user settings",
+            extra={
+                "requested_by": _user_id_str(current_user),
+                "target_user_id": str(target_id),
+                "fields": list(changes.keys()),
+            },
+        )
         return {
-            "settings": updated_settings,
+            "settings": updated.model_dump(by_alias=True),
             "status": "success",
             "message": "Settings updated successfully",
         }
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Failed to update user settings")
+        raise HTTPException(status_code=500, detail=str(exc))
