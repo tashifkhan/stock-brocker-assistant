@@ -14,7 +14,7 @@ import {
 	DialogTitle,
 	DialogFooter,
 } from "@/components/ui/dialog";
-import { useScrapeArticles, useSavedArticles } from "@/hooks/useApi";
+import { useScrapeArticles, useSavedArticles, useListFavorites, useAddFavorite, useRemoveFavorite } from "@/hooks/useApi";
 import {
 	FileText,
 	Download,
@@ -32,6 +32,7 @@ import {
 	AlertCircle,
 	RefreshCw,
  	Loader2,
+    Heart,
 } from "lucide-react";
 
 const dataSourcesConfig = [
@@ -98,6 +99,7 @@ type PreparedArticle = {
 	tags: string[];
 	authors: string[];
 	wordCount: number;
+	dbId?: string | null;
 };
 
 const SOURCE_LOOKUP: Array<{ match: string; label: string; color: string }> = [
@@ -176,6 +178,15 @@ export default function BrokerReports() {
 
 	const savedArticlesQuery = useSavedArticles(200, 0);
 	const scrapeQuery = useScrapeArticles({ ...scrapeParams, enabled: false });
+
+	// Favorites
+	const favoritesQuery = useListFavorites();
+	const favoritesData = favoritesQuery.data?.favorites ?? [];
+	const favoriteIds = new Set<string>(
+		(Array.isArray(favoritesData) ? favoritesData.map((f: any) => f._id || f.id || "") : [])
+	);
+	const addFavoriteMutation = useAddFavorite();
+	const removeFavoriteMutation = useRemoveFavorite();
 	const { data: savedData, isLoading: savedLoading, isPending: savedPending, isFetching: savedFetching, isError: savedError, error: savedErrorObj, refetch: refetchSaved } = savedArticlesQuery;
 	const { data: scrapeData, isLoading: scrapeLoading, isPending: scrapePending, isFetching: scrapeFetching, isError: scrapeError, error: scrapeErrorObj, refetch: refetchScrape } = scrapeQuery;
 
@@ -229,6 +240,7 @@ export default function BrokerReports() {
 			return {
 				id: article.link || `article-${index}`,
 				title: article.title || "Untitled",
+				dbId: (article._id as string) || undefined,
 				source,
 				company: source,
 				extractedAt: publishInfo.formatted,
@@ -664,18 +676,42 @@ export default function BrokerReports() {
 													</span>
 												)}
 											</div>
-											<Button
-												variant="ghost"
-												size="sm"
-												className="text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-												onClick={(e) => {
-													e.stopPropagation();
-													setSelectedArticle(report);
-												}}
-											>
-												Read Full Article
-												<ExternalLink className="h-3 w-3 ml-1" />
-											</Button>
+											<div className="flex items-center gap-2">
+												<Button
+													variant="ghost"
+													size="sm"
+													className="text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+													onClick={(e) => {
+														e.stopPropagation();
+														setSelectedArticle(report);
+													}}
+												>
+													Read Full Article
+													<ExternalLink className="h-3 w-3 ml-1" />
+												</Button>
+
+												<Button
+													variant={favoriteIds.has(report.dbId || "") ? "destructive" : "ghost"}
+													size="sm"
+													className="text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+													onClick={async (e) => {
+														e.stopPropagation();
+														if (!report.dbId) return;
+														try {
+															if (favoriteIds.has(report.dbId)) {
+																await removeFavoriteMutation.mutateAsync(report.dbId);
+															} else {
+																await addFavoriteMutation.mutateAsync(report.dbId);
+															}
+														} catch (err) {
+															console.error("toggle favorite failed", err);
+														}
+													}}
+												>
+													<Heart className="h-4 w-4 mr-1" />
+													{favoriteIds.has(report.dbId || "") ? "Favorited" : "Favorite"}
+												</Button>
+											</div>
 										</div>
 									</div>
 								);
@@ -684,15 +720,40 @@ export default function BrokerReports() {
 										Showing {filteredCount} of {totalArticles} scraped article
 										{totalArticles === 1 ? "" : "s"}.
 									</span>
-									<Button
+									<div className="flex items-center gap-2">
+										<Button
 										size="sm"
 										variant="secondary"
 										className="bg-accent text-accent-foreground"
 										disabled={preparedReports.length === 0}
-									>
-										<FileText className="h-4 w-4 mr-1" />
-										Synthesize All Reports
-									</Button>
+										>
+											<FileText className="h-4 w-4 mr-1" />
+											Synthesize All Reports
+										</Button>
+
+										<Button
+											size="sm"
+											variant="outline"
+											onClick={async () => {
+												const toFavorite = preparedReports
+													.map((r) => r.dbId)
+													.filter(Boolean) as string[];
+												for (const id of toFavorite) {
+													if (!favoriteIds.has(id)) {
+														try {
+															await addFavoriteMutation.mutateAsync(id);
+														} catch (err) {
+															console.error("favorite all failed", err);
+														}
+													}
+												}
+											}}
+											disabled={preparedReports.length === 0}
+										>
+											<FileText className="h-4 w-4 mr-1" />
+											Favorite All
+										</Button>
+									</div>
 								</div>
 							</>
 						)}

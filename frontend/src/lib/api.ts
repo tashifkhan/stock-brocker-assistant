@@ -252,6 +252,26 @@ export const articlesApi = {
   },
 };
 
+// ============ USER / FAVORITES API ============
+export const userApi = {
+  listFavorites: () => {
+    return apiCall<any>(`/user/favorites`);
+  },
+
+  addFavorite: (articleId: string) => {
+    return apiCall<any>(`/user/favorites`, {
+      method: "POST",
+      body: JSON.stringify({ article_id: articleId }),
+    });
+  },
+
+  removeFavorite: (articleId: string) => {
+    return apiCall<any>(`/user/favorites/${articleId}`, {
+      method: "DELETE",
+    });
+  },
+};
+
 // ============ EDITORIAL API ============
 
 export const editorialApi = {

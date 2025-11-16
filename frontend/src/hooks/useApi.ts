@@ -125,6 +125,38 @@ export function useSavedArticles(limit: number = 50, skip: number = 0) {
   });
 }
 
+// ============ USER FAVORITES HOOKS ============
+export function useListFavorites() {
+  return useQuery({
+    queryKey: ["user", "favorites"],
+    queryFn: () => userApi.listFavorites(),
+    staleTime: 2 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
+}
+
+export function useAddFavorite() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (articleId: string) => userApi.addFavorite(articleId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["user", "favorites"] });
+      queryClient.invalidateQueries({ queryKey: ["articles", "saved"] });
+    },
+  });
+}
+
+export function useRemoveFavorite() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (articleId: string) => userApi.removeFavorite(articleId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["user", "favorites"] });
+      queryClient.invalidateQueries({ queryKey: ["articles", "saved"] });
+    },
+  });
+}
+
 // ============ EDITORIAL HOOKS ============
 
 export function useEditorialSuggestions(
