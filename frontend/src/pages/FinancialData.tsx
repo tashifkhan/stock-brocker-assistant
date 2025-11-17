@@ -1,8 +1,9 @@
 import { ChangeEvent, useEffect, useRef, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Separator } from "@/components/ui/separator";
 import {
   Upload,
   FileText,
@@ -11,6 +12,11 @@ import {
   CheckCircle,
   AlertCircle,
   Loader2,
+  ChevronDown,
+  ChevronUp,
+  BarChart3,
+  Calendar,
+  Info,
 } from "lucide-react";
 import {
   useUploadFinancialDocument,
@@ -35,6 +41,7 @@ export default function FinancialData() {
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
   const [currentAnalysis, setCurrentAnalysis] = useState<AnalysisResult | null>(null);
   const [selectedAnalysisId, setSelectedAnalysisId] = useState<string | null>(null);
+  const [expandedParameters, setExpandedParameters] = useState<Set<number>>(new Set([0]));
   const uploadMutation = useUploadFinancialDocument();
   const analyzeMutation = useAnalyzeDocument();
   const historyQuery = useFinancialAnalysisHistory(20);
@@ -59,6 +66,19 @@ export default function FinancialData() {
   const handleHistorySelect = (fileId: string) => {
     setSelectedAnalysisId(fileId);
     setCurrentAnalysis((prev) => (prev?.file_id === fileId ? prev : null));
+    setExpandedParameters(new Set([0]));
+  };
+
+  const toggleParameter = (index: number) => {
+    setExpandedParameters((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      return next;
+    });
   };
 
   useEffect(() => {
@@ -131,19 +151,29 @@ export default function FinancialData() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-bold text-foreground">Financial Data Analysis</h1>
-        <p className="text-muted-foreground">
-          Upload financial documents and extract key insights with the analysis service.
-        </p>
+      <div className="space-y-3">
+        <div className="flex items-center gap-3">
+          <div className="p-3 rounded-lg bg-primary/10">
+            <BarChart3 className="h-8 w-8 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Financial Data Analysis</h1>
+            <p className="text-muted-foreground mt-1">
+              Upload financial documents and extract key insights with AI-powered analysis
+            </p>
+          </div>
+        </div>
       </div>
 
-      <Card>
+      <Card className="border-2">
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
-            <Upload className="h-5 w-5" />
+            <Upload className="h-5 w-5 text-primary" />
             <span>Upload and Analyze Document</span>
           </CardTitle>
+          <CardDescription>
+            Support for PDF files containing financial reports, 10-K, 10-Q, and investor presentations
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <input
@@ -153,34 +183,46 @@ export default function FinancialData() {
             className="hidden"
             onChange={handleFileChange}
           />
-          <div className="border-2 border-dashed border-muted rounded-lg p-8 text-center space-y-4">
-            <FileText className="h-12 w-12 text-muted-foreground mx-auto" />
+          <div className="border-2 border-dashed border-muted rounded-lg p-8 text-center space-y-4 transition-colors hover:border-primary/50 hover:bg-muted/30">
+            <div className="inline-flex p-4 rounded-full bg-primary/10">
+              <FileText className="h-12 w-12 text-primary" />
+            </div>
             <div>
-              <p className="text-lg font-medium">
+              <p className="text-lg font-semibold">
                 Drag and drop a PDF or use the button below
               </p>
-              <p className="text-muted-foreground">
-                Only PDF documents are supported at the moment.
+              <p className="text-sm text-muted-foreground mt-1">
+                PDF documents up to 50MB • Instant AI analysis
               </p>
             </div>
-            <div className="flex items-center justify-center gap-3">
-              <Button onClick={() => fileInputRef.current?.click()} disabled={isProcessing}>
+            <div className="flex flex-col items-center justify-center gap-3">
+              <Button 
+                onClick={() => fileInputRef.current?.click()} 
+                disabled={isProcessing}
+                size="lg"
+                variant="outline"
+              >
+                <Upload className="mr-2 h-4 w-4" />
                 Choose File
               </Button>
               {selectedFileName ? (
-                <span className="text-sm text-muted-foreground">
-                  Selected: {selectedFileName}
-                </span>
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-primary/10 text-primary">
+                  <FileText className="h-4 w-4" />
+                  <span className="text-sm font-medium">
+                    {selectedFileName}
+                  </span>
+                </div>
               ) : (
-                <span className="text-sm text-muted-foreground">
+                <span className="text-xs text-muted-foreground">
                   No file selected
                 </span>
               )}
             </div>
             <Button
-              className="w-full md:w-auto"
+              className="w-full md:w-auto mt-2"
               onClick={handleProcessDocument}
               disabled={isProcessing || !selectedFile}
+              size="lg"
             >
               {isProcessing ? (
                 <span className="flex items-center gap-2">
@@ -188,7 +230,10 @@ export default function FinancialData() {
                   Processing...
                 </span>
               ) : (
-                "Upload & Analyze"
+                <span className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4" />
+                  Upload & Analyze
+                </span>
               )}
             </Button>
           </div>
@@ -217,15 +262,29 @@ export default function FinancialData() {
       </Card>
 
       {shouldShowAnalysisCard && (
-        <Card>
-          <CardHeader>
+        <Card className="border-2">
+          <CardHeader className="pb-3">
             <div className="flex items-center justify-between flex-wrap gap-3">
-              <CardTitle className="flex items-center space-x-2">
-                <TrendingUp className="h-5 w-5 text-primary" />
-                <span>Analysis Details</span>
-              </CardTitle>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Badge variant="secondary" className="flex items-center gap-1 text-xs">
+              <div className="space-y-1">
+                <CardTitle className="flex items-center space-x-2">
+                  <TrendingUp className="h-5 w-5 text-primary" />
+                  <span>Analysis Results</span>
+                </CardTitle>
+                <CardDescription className="flex items-center gap-2">
+                  <Calendar className="h-3 w-3" />
+                  {selectedHistoryRecord
+                    ? `Updated ${formatDate(selectedHistoryRecord.updated_at ?? selectedHistoryRecord.created_at)}`
+                    : `Processed ${formatDate()}`}
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                {parameterEntries.length > 0 && (
+                  <Badge variant="outline" className="flex items-center gap-1">
+                    <Info className="h-3 w-3" />
+                    {parameterEntries.length} {parameterEntries.length === 1 ? 'Parameter' : 'Parameters'}
+                  </Badge>
+                )}
+                <Badge variant="secondary" className="flex items-center gap-1">
                   {isAnalysisLoading ? (
                     <Loader2 className="h-3 w-3 animate-spin" />
                   ) : (
@@ -235,11 +294,6 @@ export default function FinancialData() {
                     .replace(/_/g, " ")
                     .replace(/\b\w/g, (char) => char.toUpperCase())}
                 </Badge>
-                <span>
-                  {selectedHistoryRecord
-                    ? `Updated ${formatDate(selectedHistoryRecord.updated_at ?? selectedHistoryRecord.created_at)}`
-                    : `Processed ${formatDate()}`}
-                </span>
               </div>
             </div>
           </CardHeader>
@@ -251,48 +305,93 @@ export default function FinancialData() {
               </div>
             ) : (
               <>
-                <div className="rounded-lg border bg-muted/10 p-4">
-                  <p className="text-sm text-muted-foreground mb-2">
-                    File: <span className="font-medium text-foreground">{activeAnalysis?.filename}</span>
-                  </p>
-                  <p className="leading-relaxed text-sm">
-                    {activeAnalysis?.summary ?? "No summary generated for this document."}
-                  </p>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium text-muted-foreground">Document</span>
+                  </div>
+                  <div className="rounded-lg border-2 bg-gradient-to-br from-muted/30 to-muted/10 p-5">
+                    <p className="text-sm font-semibold text-foreground mb-3">
+                      {activeAnalysis?.filename}
+                    </p>
+                    <Separator className="mb-3" />
+                    <div className="prose prose-sm max-w-none">
+                      <p className="leading-relaxed text-sm text-foreground/90">
+                        {activeAnalysis?.summary ?? "No summary generated for this document."}
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
                 {parameterEntries.length > 0 && (
-                  <div className="space-y-4">
-                    {parameterEntries.map((parameter, index) => (
-                      <div
-                        key={`${parameter.parameter_name}-${index}`}
-                        className="rounded-lg border bg-card/60 p-4 text-sm space-y-3"
-                      >
-                        <div className="grid gap-2 md:grid-cols-2">
-                          <div>
-                            <p className="font-medium text-foreground">Name</p>
-                            <p className="text-muted-foreground">{parameter.parameter_name}</p>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium text-muted-foreground">Key Financial Parameters</span>
+                    </div>
+                    <div className="space-y-3">
+                      {parameterEntries.map((parameter, index) => {
+                        const isExpanded = expandedParameters.has(index);
+                        return (
+                          <div
+                            key={`${parameter.parameter_name}-${index}`}
+                            className="rounded-lg border-2 bg-card transition-all hover:shadow-md overflow-hidden"
+                          >
+                            <button
+                              onClick={() => toggleParameter(index)}
+                              className="w-full p-4 text-left flex items-center justify-between hover:bg-muted/30 transition-colors"
+                            >
+                              <div className="flex-1 space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="secondary" className="text-xs">
+                                    #{index + 1}
+                                  </Badge>
+                                  <h4 className="font-semibold text-foreground">{parameter.parameter_name}</h4>
+                                </div>
+                                {!isExpanded && (
+                                  <p className="text-xs text-muted-foreground line-clamp-1">
+                                    {parameter.definition}
+                                  </p>
+                                )}
+                              </div>
+                              {isExpanded ? (
+                                <ChevronUp className="h-5 w-5 text-muted-foreground shrink-0" />
+                              ) : (
+                                <ChevronDown className="h-5 w-5 text-muted-foreground shrink-0" />
+                              )}
+                            </button>
+                            {isExpanded && (
+                              <div className="px-4 pb-4 pt-2 space-y-4 border-t bg-muted/20">
+                                <div className="grid gap-4 md:grid-cols-2">
+                                  <div className="space-y-1">
+                                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Importance</p>
+                                    <p className="text-sm text-foreground">{parameter.importance}</p>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Interpretation</p>
+                                    <p className="text-sm text-foreground">{parameter.interpretation}</p>
+                                  </div>
+                                </div>
+                                <Separator />
+                                <div className="space-y-1">
+                                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Definition</p>
+                                  <p className="text-sm text-foreground leading-relaxed">{parameter.definition}</p>
+                                </div>
+                                {parameter.benchmark_or_note && (
+                                  <>
+                                    <Separator />
+                                    <div className="space-y-1">
+                                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Benchmark / Note</p>
+                                      <p className="text-sm text-foreground leading-relaxed">{parameter.benchmark_or_note}</p>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            )}
                           </div>
-                          <div>
-                            <p className="font-medium text-foreground">Importance</p>
-                            <p className="text-muted-foreground">{parameter.importance}</p>
-                          </div>
-                        </div>
-                        <div>
-                          <p className="font-medium text-foreground">Definition</p>
-                          <p className="text-muted-foreground">{parameter.definition}</p>
-                        </div>
-                        <div>
-                          <p className="font-medium text-foreground">Interpretation</p>
-                          <p className="text-muted-foreground">{parameter.interpretation}</p>
-                        </div>
-                        {parameter.benchmark_or_note && (
-                          <div>
-                            <p className="font-medium text-foreground">Benchmark / Note</p>
-                            <p className="text-muted-foreground">{parameter.benchmark_or_note}</p>
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
 
@@ -308,9 +407,15 @@ export default function FinancialData() {
         </Card>
       )}
 
-      <Card>
+      <Card className="border-2">
         <CardHeader>
-          <CardTitle>Analysis History</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5 text-primary" />
+            Analysis History
+          </CardTitle>
+          <CardDescription>
+            View and select from your previously analyzed documents
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {historyQuery.isError ? (
@@ -343,7 +448,9 @@ export default function FinancialData() {
                   return (
                     <TableRow
                       key={analysis.file_id}
-                      className={`${isSelected ? "bg-muted/50" : ""} cursor-pointer`}
+                      className={`${
+                        isSelected ? "bg-primary/10 border-l-4 border-l-primary" : ""
+                      } cursor-pointer hover:bg-muted/50 transition-colors`}
                       onClick={() => handleHistorySelect(analysis.file_id)}
                     >
                       <TableCell className="font-medium">{analysis.filename}</TableCell>
