@@ -303,135 +303,143 @@ export default function Editorial() {
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <PenTool className="h-5 w-5 text-primary" />
-            <span>Request suggestions</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form className="space-y-4" onSubmit={handleSubmit}>
-            <div className="grid gap-4 md:grid-cols-[2fr_1fr]">
-              <div className="space-y-2">
-                <label htmlFor="editorial-text" className="text-sm font-medium">
-                  Draft text
-                </label>
-                <Textarea
-                  id="editorial-text"
-                  value={text}
-                  onChange={(event) => setText(event.target.value)}
-                  rows={6}
-                  placeholder="Paste content that needs polishing..."
-                  className="resize-none"
-                />
-              </div>
-              <div className="space-y-3">
-                <div className="space-y-2">
-                  <label htmlFor="content-type" className="text-sm font-medium">
-                    Content type
-                  </label>
-                  <Select
-                    value={contentType}
-                    onValueChange={(value) => setContentType(value)}
-                  >
-                    <SelectTrigger id="content-type">
-                      <SelectValue placeholder="Select content type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {contentTypes.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <label htmlFor="suggestion-tone" className="text-sm font-medium">
-                    Tone preference
-                  </label>
-                  <Select
-                    value={suggestionToneValue}
-                    onValueChange={(value) => setSuggestionToneValue(value)}
-                  >
-                    <SelectTrigger id="suggestion-tone">
-                      <SelectValue placeholder="Select tone" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={SUGGESTION_TONE_NONE}>No preference</SelectItem>
-                      {suggestionToneOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <label htmlFor="word-count" className="text-sm font-medium">
-                    Word count
-                  </label>
-                  <Input
-                    id="word-count"
-                    value={text.trim() ? String(text.trim().split(/\s+/).length) : "0"}
-                    readOnly
-                    className="bg-muted"
-                  />
-                </div>
-              </div>
-            </div>
-            <Button type="submit" disabled={suggestionMutation.isPending} className="w-full md:w-auto">
-              {suggestionMutation.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <PenTool className="mr-2 h-4 w-4" />
-              )}
-              {suggestionMutation.isPending ? "Analyzing..." : "Generate suggestions"}
-            </Button>
-          </form>
-
-          {suggestionMutation.isError && (
-            <Alert variant="destructive" className="mt-4">
-              <AlertTitle>Failed to fetch suggestions</AlertTitle>
-              <AlertDescription>
-                {suggestionMutation.error instanceof Error
-                  ? suggestionMutation.error.message
-                  : "Something went wrong calling the editorial service."}
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {suggestionData && suggestionData.suggestions.length > 0 && (
-            <div className="mt-6 space-y-4">
-              <div className="flex items-center gap-2">
-                <Lightbulb className="h-4 w-4 text-primary" />
-                <h3 className="text-sm font-semibold uppercase text-muted-foreground">
-                  Suggested improvements
-                </h3>
-              </div>
-              <div className="space-y-3">
-                {suggestionData.suggestions.map((suggestion, index) => (
-                  <div key={`${suggestion}-${index}`} className="rounded-lg border bg-card p-4 shadow-sm">
-                    <p className="text-sm leading-relaxed">{suggestion}</p>
-                  </div>
-                ))}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Content type: <span className="font-medium">{suggestionData.content_type}</span>
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Tabs defaultValue="context" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
+      <Tabs defaultValue="suggestions" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="suggestions">Suggestions</TabsTrigger>
           <TabsTrigger value="context">Context</TabsTrigger>
           <TabsTrigger value="style">Style guide</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
-          <TabsTrigger value="draft">Draft builder</TabsTrigger>
+          <TabsTrigger value="draft">Draft</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="suggestions">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <PenTool className="h-5 w-5 text-primary" />
+                <span>Content improvement suggestions</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form className="space-y-4" onSubmit={handleSubmit}>
+                <div className="grid gap-4 md:grid-cols-[2fr_1fr]">
+                  <div className="space-y-2">
+                    <label htmlFor="editorial-text" className="text-sm font-medium">
+                      Draft text
+                    </label>
+                    <Textarea
+                      id="editorial-text"
+                      value={text}
+                      onChange={(event) => setText(event.target.value)}
+                      rows={8}
+                      placeholder="Paste content that needs polishing..."
+                      className="resize-none"
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <label htmlFor="content-type" className="text-sm font-medium">
+                        Content type
+                      </label>
+                      <Select
+                        value={contentType}
+                        onValueChange={(value) => setContentType(value)}
+                      >
+                        <SelectTrigger id="content-type">
+                          <SelectValue placeholder="Select content type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {contentTypes.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <label htmlFor="suggestion-tone" className="text-sm font-medium">
+                        Tone preference
+                      </label>
+                      <Select
+                        value={suggestionToneValue}
+                        onValueChange={(value) => setSuggestionToneValue(value)}
+                      >
+                        <SelectTrigger id="suggestion-tone">
+                          <SelectValue placeholder="Select tone" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={SUGGESTION_TONE_NONE}>No preference</SelectItem>
+                          {suggestionToneOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <label htmlFor="word-count" className="text-sm font-medium">
+                        Word count
+                      </label>
+                      <Input
+                        id="word-count"
+                        value={text.trim() ? String(text.trim().split(/\s+/).length) : "0"}
+                        readOnly
+                        className="bg-muted"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <Button type="submit" disabled={suggestionMutation.isPending} className="w-full md:w-auto">
+                  {suggestionMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Lightbulb className="mr-2 h-4 w-4" />
+                  )}
+                  {suggestionMutation.isPending ? "Analyzing..." : "Generate suggestions"}
+                </Button>
+              </form>
+
+              {suggestionMutation.isError && (
+                <Alert variant="destructive" className="mt-6">
+                  <AlertTitle>Failed to fetch suggestions</AlertTitle>
+                  <AlertDescription>
+                    {suggestionMutation.error instanceof Error
+                      ? suggestionMutation.error.message
+                      : "Something went wrong calling the editorial service."}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {suggestionData && suggestionData.suggestions.length > 0 && (
+                <div className="mt-6 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Lightbulb className="h-4 w-4 text-primary" />
+                    <h3 className="text-sm font-semibold uppercase text-muted-foreground">
+                      Suggested improvements
+                    </h3>
+                  </div>
+                  <div className="space-y-3">
+                    {suggestionData.suggestions.map((suggestion, index) => (
+                      <div key={`${suggestion}-${index}`} className="rounded-lg border bg-card p-4 shadow-sm">
+                        <p className="text-sm leading-relaxed">{suggestion}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-between rounded-lg border bg-muted/30 p-3">
+                    <span className="text-xs text-muted-foreground">
+                      Content type: <span className="font-medium">{suggestionData.content_type}</span>
+                    </span>
+                    <Badge variant="secondary" className="text-xs">
+                      {suggestionData.suggestions.length} {suggestionData.suggestions.length === 1 ? 'suggestion' : 'suggestions'}
+                    </Badge>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="context">
           <Card>
