@@ -1,7 +1,16 @@
+from datetime import date, datetime
+from typing import Optional
+
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
-from typing import Optional
-from datetime import datetime, date
+
+from services.market_data import (
+    get_index_metrics,
+    get_market_movers,
+    get_market_news,
+    get_sector_performance as fetch_sector_performance,
+    get_watchlist_snapshot,
+)
 
 router = APIRouter(prefix="/market-summary", tags=["market-summary"])
 
@@ -24,7 +33,9 @@ class MarketSummaryResponse(BaseModel):
 
 
 @router.get("/daily")
-def get_daily_market_summary(date_str: Optional[str] = Query(None, description="Date in YYYY-MM-DD format")) -> MarketSummaryResponse:
+def get_daily_market_summary(
+    date_str: Optional[str] = Query(None, description="Date in YYYY-MM-DD format")
+) -> MarketSummaryResponse:
     """
     Get daily market summary including indices, gainers, losers, and top news.
 
@@ -41,58 +52,19 @@ def get_daily_market_summary(date_str: Optional[str] = Query(None, description="
         else:
             summary_date = date.today()
 
-        # Placeholder market data (in production, fetch from real market data APIs)
-        indices = [
-            MarketMetric(
-                name="S&P 500",
-                value=4500.0,
-                change=45.5,
-                change_percent=1.02,
-                trend="up",
-            ),
-            MarketMetric(
-                name="Nifty 50",
-                value=21500.0,
-                change=120.0,
-                change_percent=0.56,
-                trend="up",
-            ),
-            MarketMetric(
-                name="Sensex",
-                value=70500.0,
-                change=250.0,
-                change_percent=0.36,
-                trend="up",
-            ),
-        ]
+        indices_raw = get_index_metrics(summary_date if date_str else None)
+        if not indices_raw:
+            raise HTTPException(
+                status_code=502,
+                detail="Unable to fetch market indices from public data source.",
+            )
 
-        top_gainers = [
-            {"symbol": "AAPL", "name": "Apple Inc.", "price": 189.5, "change_percent": 3.2},
-            {"symbol": "MSFT", "name": "Microsoft Corp.", "price": 425.0, "change_percent": 2.8},
-            {"symbol": "GOOGL", "name": "Alphabet Inc.", "price": 142.5, "change_percent": 2.1},
-        ]
-
-        top_losers = [
-            {"symbol": "META", "name": "Meta Platforms", "price": 312.5, "change_percent": -1.5},
-            {"symbol": "NVDA", "name": "NVIDIA Corp.", "price": 875.0, "change_percent": -0.8},
-        ]
-
-        market_news = [
-            {
-                "title": "Federal Reserve signals potential rate cuts",
-                "source": "Reuters",
-                "timestamp": datetime.now().isoformat(),
-            },
-            {
-                "title": "Tech stocks rally on earnings reports",
-                "source": "Bloomberg",
-                "timestamp": datetime.now().isoformat(),
-            },
-        ]
+        top_gainers, top_losers = get_market_movers(count=6)
+        market_news = get_market_news(count=6)
 
         return MarketSummaryResponse(
             date=summary_date,
-            indices=indices,
+            indices=[MarketMetric(**metric) for metric in indices_raw],
             top_gainers=top_gainers,
             top_losers=top_losers,
             market_news=market_news,
@@ -100,7 +72,9 @@ def get_daily_market_summary(date_str: Optional[str] = Query(None, description="
         )
 
     except ValueError as e:
-        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+        raise HTTPException(
+            status_code=400, detail="Invalid date format. Use YYYY-MM-DD."
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -117,13 +91,21 @@ def get_sector_performance(date_str: Optional[str] = Query(None)) -> dict:
         Dictionary with sector performance data
     """
     try:
-        sectors = {
-            "Technology": {"change": 2.3, "leaders": ["AAPL", "MSFT"]},
-            "Healthcare": {"change": 1.8, "leaders": ["JNJ", "UNH"]},
-            "Finance": {"change": 1.2, "leaders": ["JPM", "BAC"]},
-            "Energy": {"change": -0.5, "leaders": ["XOM", "CVX"]},
-            "Consumer": {"change": 0.8, "leaders": ["AMZN", "WMT"]},
-        }
+        if date_str:
+            try:
+                target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+            except ValueError:
+                raise HTTPException(
+                    status_code=400, detail="Invalid date format. Use YYYY-MM-DD."
+                )
+        else:
+            target_date = None
+        sectors = fetch_sector_performance(target_date)
+        if not sectors:
+            raise HTTPException(
+                status_code=502,
+                detail="Unable to fetch sector performance from public data source.",
+            )
 
         return {
             "sectors": sectors,
@@ -135,7 +117,9 @@ def get_sector_performance(date_str: Optional[str] = Query(None)) -> dict:
 
 
 @router.get("/watchlist")
-def get_watchlist_performance(symbols: str = Query(..., description="Comma-separated stock symbols")) -> dict:
+def get_watchlist_performance(
+    symbols: str = Query(..., description="Comma-separated stock symbols")
+) -> dict:
     """
     Get performance data for a custom watchlist.
 
@@ -146,17 +130,13 @@ def get_watchlist_performance(symbols: str = Query(..., description="Comma-separ
         Dictionary with watchlist performance data
     """
     try:
-        symbol_list = [s.strip().upper() for s in symbols.split(",")]
+        symbol_list = [s.strip() for s in symbols.split(",") if s.strip()]
+        if not symbol_list:
+            raise HTTPException(
+                status_code=400, detail="At least one symbol is required."
+            )
 
-        watchlist_data = []
-        for symbol in symbol_list:
-            watchlist_data.append({
-                "symbol": symbol,
-                "price": 100.0,
-                "change": 2.5,
-                "change_percent": 2.5,
-                "volume": 1000000,
-            })
+        watchlist_data = get_watchlist_snapshot(symbol_list)
 
         return {
             "watchlist": watchlist_data,
