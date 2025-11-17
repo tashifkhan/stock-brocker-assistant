@@ -1,4 +1,5 @@
 """Utility functions for generating editorial content using Google GenAI."""
+
 from __future__ import annotations
 
 import json
@@ -45,12 +46,17 @@ def generate_editorial_article(
     reports: Sequence[str],
     market_filings: Sequence[str],
     tone: str = "Professional and informative",
+    articles: Sequence[str] | None = None,
+    additional_context: Sequence[str] | None = None,
 ) -> dict[str, object]:
     """Create an editorial article informed by market context."""
     prompt = f"""
     You are an editorial assistant for a financial news desk. Draft a concise briefing article for the daily newsletter.
 
     Context to incorporate:
+    • Article highlights:
+    {_format_list(articles or [])}
+
     • Market summary:
     {market_summary}
 
@@ -59,6 +65,9 @@ def generate_editorial_article(
 
     • Regulatory filings:
     {_format_list(market_filings)}
+
+    • Additional context:
+    {_format_list(additional_context or [])}
 
     Tone: {tone}.
 
