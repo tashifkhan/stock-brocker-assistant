@@ -150,98 +150,68 @@ export default function MarketSummary() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-green-600">
               <TrendingUp className="h-5 w-5" />
-              Top Movers
+              Top Gainers
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <p className="mb-2 text-xs uppercase text-muted-foreground">Gainers</p>
-              <div className="space-y-2">
-                {topGainers.slice(0, 5).map((item, index) => (
-                  <div
-                    key={`${item.symbol}-${index}`}
-                    className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate font-medium leading-none">{item.symbol}</p>
-                      {item.name && (
-                        <p className="truncate text-xs text-muted-foreground">{item.name}</p>
-                      )}
-                    </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <span className="text-sm font-medium">
-                        {formatCurrency(item.price, item.region)}
-                      </span>
-                      <Badge className="bg-green-100 text-green-700">
-                        {formatChange(item.change_percent)}
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
-                {topGainers.length === 0 && (
-                  <p className="text-sm text-muted-foreground">No gainers reported.</p>
-                )}
+          <CardContent className="space-y-2">
+            {topGainers.slice(0, 5).map((item, index) => (
+              <div
+                key={`${item.symbol}-${index}`}
+                className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-medium leading-none">{item.symbol}</p>
+                  {item.name && (
+                    <p className="truncate text-xs text-muted-foreground">{item.name}</p>
+                  )}
+                </div>
+                <div className="flex flex-col items-end gap-1">
+                  <span className="text-sm font-medium">
+                    {formatCurrency(item.price, item.region)}
+                  </span>
+                  <Badge className="bg-green-100 text-green-700">
+                    {formatChange(item.change_percent)}
+                  </Badge>
+                </div>
               </div>
-            </div>
-            <div className="border-t pt-4">
-              <p className="mb-2 text-xs uppercase text-muted-foreground">Losers</p>
-              <div className="space-y-2">
-                {topLosers.slice(0, 5).map((item, index) => (
-                  <div
-                    key={`${item.symbol}-${index}`}
-                    className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate font-medium leading-none">{item.symbol}</p>
-                      {item.name && (
-                        <p className="truncate text-xs text-muted-foreground">{item.name}</p>
-                      )}
-                    </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <span className="text-sm font-medium">
-                        {formatCurrency(item.price, item.region)}
-                      </span>
-                      <Badge className="bg-red-100 text-red-700">
-                        {formatChange(item.change_percent)}
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
-                {topLosers.length === 0 && (
-                  <p className="text-sm text-muted-foreground">No losers reported.</p>
-                )}
-              </div>
-            </div>
+            ))}
+            {topGainers.length === 0 && (
+              <p className="text-sm text-muted-foreground">No gainers reported.</p>
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Latest Market Headlines</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-red-600">
+              <TrendingDown className="h-5 w-5" />
+              Top Losers
+            </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {marketNews.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No news items available for this date.</p>
-            ) : (
-              marketNews.map((story, index) => (
-                <div key={index} className="rounded-lg border p-3">
-                  <a
-                    href={story.link ?? "#"}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-sm font-medium hover:underline"
-                  >
-                    {story.title}
-                  </a>
-                  <p className="text-xs text-muted-foreground">
-                    {story.source}
-                    {story.region ? ` • ${story.region}` : ""}
-                    {story.timestamp
-                      ? ` • ${new Date(story.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
-                      : ""}
-                  </p>
+          <CardContent className="space-y-2">
+            {topLosers.slice(0, 5).map((item, index) => (
+              <div
+                key={`${item.symbol}-${index}`}
+                className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-medium leading-none">{item.symbol}</p>
+                  {item.name && (
+                    <p className="truncate text-xs text-muted-foreground">{item.name}</p>
+                  )}
                 </div>
-              ))
+                <div className="flex flex-col items-end gap-1">
+                  <span className="text-sm font-medium">
+                    {formatCurrency(item.price, item.region)}
+                  </span>
+                  <Badge className="bg-red-100 text-red-700">
+                    {formatChange(item.change_percent)}
+                  </Badge>
+                </div>
+              </div>
+            ))}
+            {topLosers.length === 0 && (
+              <p className="text-sm text-muted-foreground">No losers reported.</p>
             )}
           </CardContent>
         </Card>
