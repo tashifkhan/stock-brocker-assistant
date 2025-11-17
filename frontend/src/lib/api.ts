@@ -91,6 +91,58 @@ export interface StyleGuide {
   status: string;
 }
 
+export interface EditorialContextArticle {
+  id: string;
+  title: string;
+  summary: string;
+  source?: string | null;
+  link?: string | null;
+  publish_date?: string | null;
+  tags: string[];
+}
+
+export interface EditorialContextReport {
+  id: string;
+  created_at: string;
+  summary: string;
+  parameter_highlights: string[];
+}
+
+export interface EditorialContextFiling {
+  id: string;
+  title: string;
+  source?: string | null;
+  link?: string | null;
+  filed_at?: string | null;
+  notes?: string | null;
+}
+
+export interface EditorialContextTotals {
+  articles: number;
+  reports: number;
+  filings: number;
+}
+
+export interface EditorialContext {
+  status: string;
+  market_brief?: string | null;
+  articles: EditorialContextArticle[];
+  reports: EditorialContextReport[];
+  filings: EditorialContextFiling[];
+  totals: EditorialContextTotals;
+}
+
+export interface EditorialDraftResponse {
+  headline: string;
+  subheadline: string;
+  article: string;
+  key_points: string[];
+  next_steps: string[];
+  data_callouts: string[];
+  risk_disclaimer: string;
+  context_digest: string[];
+}
+
 // Article Types
 export interface Article {
   _id?: string;
@@ -320,13 +372,17 @@ export const userApi = {
 // ============ EDITORIAL API ============
 
 export const editorialApi = {
-  getSuggestions: (text: string, contentType: string = "article") => {
+  getSuggestions: (text: string, contentType: string = "article", tone?: string) => {
+    const body: Record<string, unknown> = {
+      text,
+      content_type: contentType,
+    };
+    if (tone) {
+      body.tone = tone;
+    }
     return apiCall<EditorialSuggestion>("/editorial/suggestions", {
       method: "POST",
-      body: JSON.stringify({
-        text,
-        content_type: contentType,
-      }),
+      body: JSON.stringify(body),
     });
   },
 
@@ -338,6 +394,31 @@ export const editorialApi = {
     return apiCall<{ analytics: Record<string, any>; status: string }>(
       "/editorial/analytics"
     );
+  },
+
+  getContext: (
+    params: { articleLimit?: number; reportLimit?: number; filingLimit?: number } = {}
+  ) => {
+    const searchParams = new URLSearchParams();
+    if (params.articleLimit) searchParams.set("article_limit", String(params.articleLimit));
+    if (params.reportLimit) searchParams.set("report_limit", String(params.reportLimit));
+    if (params.filingLimit) searchParams.set("filing_limit", String(params.filingLimit));
+    const query = searchParams.toString();
+    return apiCall<EditorialContext>(`/editorial/context${query ? `?${query}` : ""}`);
+  },
+
+  generateDraft: (payload: {
+    market_summary: string;
+    reports: string[];
+    market_filings: string[];
+    articles: string[];
+    additional_context: string[];
+    tone: string;
+  }) => {
+    return apiCall<EditorialDraftResponse>("/editorial-assistant/generate", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
   },
 };
 

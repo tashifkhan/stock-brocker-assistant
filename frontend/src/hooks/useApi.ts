@@ -177,11 +177,12 @@ export function useRemoveFavorite() {
 export function useEditorialSuggestions(
   text: string,
   contentType: string = "article",
+  tone?: string,
   enabled: boolean = true
 ) {
   return useQuery({
-    queryKey: ["editorial", "suggestions", text],
-    queryFn: () => editorialApi.getSuggestions(text, contentType),
+    queryKey: ["editorial", "suggestions", text, contentType, tone ?? ""],
+    queryFn: () => editorialApi.getSuggestions(text, contentType, tone),
     enabled: enabled && !!text,
     staleTime: 10 * 60 * 1000,
     gcTime: 60 * 60 * 1000,
@@ -202,6 +203,29 @@ export function useEditorialAnalytics() {
     queryKey: ["editorial", "analytics"],
     queryFn: () => editorialApi.getAnalytics(),
     staleTime: 30 * 60 * 1000, // 30 minutes
+    gcTime: 60 * 60 * 1000,
+  });
+}
+
+export function useEditorialContext(
+  options: { articleLimit?: number; reportLimit?: number; filingLimit?: number } = {}
+) {
+  const { articleLimit, reportLimit, filingLimit } = options;
+  return useQuery({
+    queryKey: [
+      "editorial",
+      "context",
+      articleLimit ?? 10,
+      reportLimit ?? 8,
+      filingLimit ?? 8,
+    ],
+    queryFn: () =>
+      editorialApi.getContext({
+        articleLimit,
+        reportLimit,
+        filingLimit,
+      }),
+    staleTime: 10 * 60 * 1000,
     gcTime: 60 * 60 * 1000,
   });
 }
