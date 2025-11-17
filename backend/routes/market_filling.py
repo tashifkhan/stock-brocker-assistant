@@ -237,3 +237,78 @@ async def get_market_filings_history(
 ):
     records = await list_market_filings(source=source, limit=limit)
     return records
+
+
+@router.get("/watchlist")
+async def get_watchlist_filings(
+    symbols: str = Query(
+        ..., description="Comma-separated stock symbols or company names"
+    ),
+    source: Optional[str] = Query(
+        None, description="Optional source filter (us/india)"
+    ),
+    limit: int = Query(50, ge=1, le=200),
+) -> Dict[str, object]:
+    """Get recent filings filtered by symbols/companies from watchlist.
+
+    Query params:
+    - symbols: comma-separated list of stock symbols or company names
+    - source: optional filter for 'us' or 'india' filings
+    - limit: max number of filings to return (default 50, 1-200)
+    """
+    try:
+        # Parse symbols
+        symbol_list = [s.strip().upper() for s in symbols.split(",") if s.strip()]
+        if not symbol_list:
+            raise HTTPException(
+                status_code=400, detail="At least one symbol is required"
+            )
+
+        # Fetch recent filings from database
+        records = await list_market_filings(source=source, limit=limit)
+
+        # Filter filings that match any of the symbols
+        filtered_filings = []
+        for record in records:
+            title = (record.title or "").upper()
+            company = (
+                record.meta.get("company", "").upper()
+                if isinstance(record.meta, dict)
+                else ""
+            )
+
+            # Check if any symbol matches the title or company
+            if any(symbol in title or symbol in company for symbol in symbol_list):
+                filtered_filings.append(
+                    {
+                        "id": str(record.id),
+                        "source": record.source,
+                        "title": record.title,
+                        "company": (
+                            record.meta.get("company")
+                            if isinstance(record.meta, dict)
+                            else None
+                        ),
+                        "link": record.link,
+                        "date": (
+                            record.meta.get("date")
+                            if isinstance(record.meta, dict)
+                            else None
+                        ),
+                        "created_at": (
+                            record.created_at.isoformat() if record.created_at else None
+                        ),
+                    }
+                )
+
+        return {
+            "symbols": symbol_list,
+            "count": len(filtered_filings),
+            "filings": filtered_filings,
+            "status": "success",
+        }
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))

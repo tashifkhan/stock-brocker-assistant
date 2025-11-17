@@ -499,6 +499,27 @@ export const filingsApi = {
       }),
     });
   },
+
+  getWatchlistFilings: (symbols: string[], source?: string, limit?: number) => {
+    const params = new URLSearchParams();
+    params.append("symbols", symbols.join(","));
+    if (source) params.append("source", source);
+    if (limit) params.append("limit", limit.toString());
+    return apiCall<{
+      symbols: string[];
+      count: number;
+      filings: Array<{
+        id: string;
+        source: string;
+        title: string;
+        company?: string;
+        link: string;
+        date?: string;
+        created_at?: string;
+      }>;
+      status: string;
+    }>(`/market-filling/watchlist?${params.toString()}`);
+  },
 };
 
 // ============ ADMIN API ============

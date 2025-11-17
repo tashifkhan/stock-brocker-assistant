@@ -298,6 +298,16 @@ export function useEmailIndiaFilings() {
   });
 }
 
+export function useWatchlistFilings(symbols: string[], source?: string, limit?: number) {
+  return useQuery({
+    queryKey: ["filings", "watchlist", symbols.join(","), source, limit],
+    queryFn: () => filingsApi.getWatchlistFilings(symbols, source, limit),
+    enabled: symbols.length > 0,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
+}
+
 // ============ ADMIN HOOKS ============
 
 export function useSystemMetrics() {

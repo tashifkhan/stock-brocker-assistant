@@ -21,6 +21,7 @@ import {
   useUSFilings,
   useEmailIndiaFilings,
   useEmailUSFilings,
+  useWatchlistFilings,
 } from "@/hooks/useApi";
 import { useToast } from "@/hooks/use-toast";
 
@@ -38,6 +39,22 @@ type FilingRecord = {
   date?: string;
   [key: string]: unknown;
 };
+
+type WatchlistFiling = {
+  id: string;
+  source: string;
+  title: string;
+  company?: string;
+  link: string;
+  date?: string;
+  created_at?: string;
+};
+
+function formatChange(value: number) {
+  const rounded = Number.isFinite(value) ? value : 0;
+  const formatted = Math.abs(rounded).toFixed(2);
+  return `${rounded >= 0 ? "+" : "-"}${formatted}%`;
+}
 
 function normaliseTitle(filing: FilingRecord): string {
   return filing.title || filing.company || "Untitled filing";
@@ -58,15 +75,26 @@ function normaliseDate(filing: FilingRecord): string | undefined {
   return filing.date;
 }
 
+function normaliseCompany(filing: FilingRecord): string | undefined {
+  return filing.company;
+}
+
 export default function FilingsAlerts() {
   const { toast } = useToast();
   const [activeRegion, setActiveRegion] = useState<"us" | "india">("us");
   const [emailForm, setEmailForm] = useState<EmailFormState>({ to: "", cc: "" });
+  const [watchlistInput, setWatchlistInput] = useState("AAPL,MSFT,GOOGL");
+  const [watchlistSymbols, setWatchlistSymbols] = useState<string[]>([
+    "AAPL",
+    "MSFT",
+    "GOOGL",
+  ]);
 
   const usQuery = useUSFilings(DEFAULT_COUNT);
   const indiaQuery = useIndiaFilings(DEFAULT_COUNT);
   const sendUsFilings = useEmailUSFilings();
   const sendIndiaFilings = useEmailIndiaFilings();
+  const watchlistQuery = useWatchlistFilings(watchlistSymbols, undefined, 100);
 
   const statsCards = useMemo(
     () => [
@@ -98,6 +126,14 @@ export default function FilingsAlerts() {
 
   const handleRefresh = () => {
     void activeQuery.refetch();
+  };
+
+  const handleWatchlistUpdate = () => {
+    const symbols = watchlistInput
+      .split(",")
+      .map((entry) => entry.trim().toUpperCase())
+      .filter((entry) => entry.length > 0);
+    setWatchlistSymbols(symbols);
   };
 
   const handleEmailSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -363,6 +399,90 @@ export default function FilingsAlerts() {
           </div>
         </Alert>
       )}
+
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle>Watchlist Corporate Filings</CardTitle>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <Input
+                value={watchlistInput}
+                onChange={(event) => setWatchlistInput(event.target.value)}
+                placeholder="Comma separated symbols (e.g., AAPL, MSFT, GOOGL)"
+              />
+              <Button
+                size="sm"
+                onClick={handleWatchlistUpdate}
+                disabled={watchlistQuery.isPending}
+              >
+                Update
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {watchlistSymbols.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Add at least one company symbol to see relevant corporate filings.
+            </p>
+          ) : watchlistQuery.isLoading || watchlistQuery.isPending ? (
+            <div className="flex items-center justify-center py-6 text-sm text-muted-foreground">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Loading watchlist filings…
+            </div>
+          ) : watchlistQuery.isError ? (
+            <div className="flex items-center gap-2 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+              <AlertCircle className="h-4 w-4" />
+              <span>
+                {watchlistQuery.error instanceof Error
+                  ? watchlistQuery.error.message
+                  : "Unable to load watchlist filings."}
+              </span>
+            </div>
+          ) : watchlistQuery.data?.filings && watchlistQuery.data.filings.length > 0 ? (
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                Showing {watchlistQuery.data.count} filing{watchlistQuery.data.count !== 1 ? 's' : ''} matching: {watchlistQuery.data.symbols.join(", ")}
+              </p>
+              {watchlistQuery.data.filings.map((filing, index) => (
+                <div
+                  key={`${filing.id}-${index}`}
+                  className="border rounded-lg p-4 flex items-start justify-between gap-4"
+                >
+                  <div className="space-y-1">
+                    <p className="font-medium text-sm">{filing.title}</p>
+                    {filing.company && (
+                      <Badge variant="secondary" className="w-fit text-xs">
+                        {filing.company}
+                      </Badge>
+                    )}
+                    {filing.date && (
+                      <p className="text-xs text-muted-foreground">
+                        Filed: {new Date(filing.date).toLocaleDateString()}
+                      </p>
+                    )}
+                    <Badge variant="outline" className="w-fit text-xs uppercase">
+                      {filing.source}
+                    </Badge>
+                  </div>
+                  {filing.link && (
+                    <Button variant="outline" size="sm" asChild>
+                      <a href={filing.link} target="_blank" rel="noreferrer">
+                        <ExternalLink className="h-4 w-4 mr-1" />
+                        View
+                      </a>
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No filings found for the specified symbols. Try different symbols or check back later.
+            </p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
