@@ -105,8 +105,6 @@ class AuthService:
             "is_verified": False,
             "created_at": now,
             "updated_at": now,
-            "reset_token": None,
-            "reset_token_expires": None,
         }
 
         result = await asyncio.to_thread(users_collection.insert_one, user_document)
