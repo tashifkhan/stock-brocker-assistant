@@ -11,9 +11,9 @@ import logging
 from datetime import date, datetime, timedelta
 from typing import Iterable, Optional, Sequence, Tuple
 
+import pandas as pd
 import requests
 import yfinance as yf
-import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -37,13 +37,50 @@ SECTOR_ETFS: dict[str, dict[str, Iterable[str] | str]] = {
     "Materials": {"symbol": "XLB", "leaders": ("LIN", "SHW", "APD")},
 }
 
+US_LIQUID_TICKERS: dict[str, dict[str, str]] = {
+    "AAPL": {"name": "Apple Inc.", "region": "US"},
+    "MSFT": {"name": "Microsoft Corp.", "region": "US"},
+    "NVDA": {"name": "NVIDIA Corp.", "region": "US"},
+    "GOOGL": {"name": "Alphabet Inc.", "region": "US"},
+    "AMZN": {"name": "Amazon.com Inc.", "region": "US"},
+    "META": {"name": "Meta Platforms Inc.", "region": "US"},
+    "TSLA": {"name": "Tesla Inc.", "region": "US"},
+    "NFLX": {"name": "Netflix Inc.", "region": "US"},
+    "AVGO": {"name": "Broadcom Inc.", "region": "US"},
+    "AMD": {"name": "Advanced Micro Devices", "region": "US"},
+    "JPM": {"name": "JPMorgan Chase", "region": "US"},
+    "WMT": {"name": "Walmart Inc.", "region": "US"},
+}
+
+INDIA_LIQUID_TICKERS: dict[str, dict[str, str]] = {
+    "RELIANCE.NS": {"name": "Reliance Industries", "region": "IN"},
+    "TCS.NS": {"name": "Tata Consultancy Services", "region": "IN"},
+    "HDFCBANK.NS": {"name": "HDFC Bank", "region": "IN"},
+    "ICICIBANK.NS": {"name": "ICICI Bank", "region": "IN"},
+    "INFY.NS": {"name": "Infosys Ltd.", "region": "IN"},
+    "SBIN.NS": {"name": "State Bank of India", "region": "IN"},
+    "LT.NS": {"name": "Larsen & Toubro", "region": "IN"},
+    "HINDUNILVR.NS": {"name": "Hindustan Unilever", "region": "IN"},
+    "ITC.NS": {"name": "ITC Ltd.", "region": "IN"},
+    "BHARTIARTL.NS": {"name": "Bharti Airtel", "region": "IN"},
+    "KOTAKBANK.NS": {"name": "Kotak Mahindra Bank", "region": "IN"},
+    "ASIANPAINT.NS": {"name": "Asian Paints", "region": "IN"},
+}
+
 YAHOO_SCREENER_URL = (
     "https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved"
 )
-YAHOO_NEWS_URL = "https://query1.finance.yahoo.com/v2/finance/news"
 YAHOO_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
     "Accept": "application/json",
+}
+
+NEWS_SYMBOLS: dict[str, str] = {
+    "^GSPC": "US",
+    "^IXIC": "US",
+    "^DJI": "US",
+    "^NSEI": "IN",
+    "^BSESN": "IN",
 }
 
 
@@ -123,6 +160,33 @@ def get_sector_performance(target: Optional[date] = None) -> dict[str, dict]:
     return summary
 
 
+def _build_snapshot(
+    symbol: str,
+    name: str,
+    region: str,
+    target: Optional[date] = None,
+) -> Optional[dict]:
+    history = _fetch_history(symbol, target)
+    rows = _extract_rows(history)
+    if not rows:
+        return None
+    latest, previous = rows
+    price = float(latest.get("Close", 0.0))
+    if not price:
+        return None
+    prev_close = float(previous.get("Close", price)) if previous else price
+    change = price - prev_close
+    change_percent = (change / prev_close * 100) if prev_close else 0.0
+    return {
+        "symbol": symbol,
+        "name": name,
+        "price": round(price, 2),
+        "change": round(change, 2),
+        "change_percent": round(change_percent, 2),
+        "region": region,
+    }
+
+
 def _fetch_screener(scr_id: str, region: str, count: int) -> list[dict]:
     params = {
         "scrIds": scr_id,
@@ -155,6 +219,7 @@ def _fetch_screener(scr_id: str, region: str, count: int) -> list[dict]:
                 "symbol": quote.get("symbol"),
                 "name": quote.get("longName") or quote.get("shortName"),
                 "price": round(float(price), 2),
+                "change": round(float(quote.get("regularMarketChange", 0.0)), 2),
                 "change_percent": round(float(change), 2),
                 "region": region,
             }
@@ -174,38 +239,70 @@ def _dedupe(symbols: Iterable[dict]) -> list[dict]:
     return unique
 
 
-def get_market_movers(count: int = 6) -> tuple[list[dict], list[dict]]:
-    us_gainers = _fetch_screener("day_gainers", "US", count)
-    in_gainers = _fetch_screener("day_gainers", "IN", count)
-    us_losers = _fetch_screener("day_losers", "US", count)
-    in_losers = _fetch_screener("day_losers", "IN", count)
+def get_market_movers(
+    count: int = 6, target: Optional[date] = None
+) -> tuple[list[dict], list[dict]]:
+    universe = {**US_LIQUID_TICKERS, **INDIA_LIQUID_TICKERS}
+    snapshots: list[dict] = []
+    for symbol, meta in universe.items():
+        try:
+            snapshot = _build_snapshot(
+                symbol=symbol,
+                name=meta.get("name", symbol),
+                region=meta.get("region", "US"),
+                target=target,
+            )
+            if snapshot:
+                snapshots.append(snapshot)
+        except Exception as exc:  # pragma: no cover - network resiliency
+            logger.debug("Unable to build mover snapshot for %s: %s", symbol, exc)
 
-    top_gainers = _dedupe(us_gainers + in_gainers)[:count]
-    top_losers = _dedupe(us_losers + in_losers)[:count]
+    gainers = [item for item in snapshots if item.get("change_percent", 0) > 0]
+    losers = [item for item in snapshots if item.get("change_percent", 0) < 0]
+
+    gainers.sort(key=lambda item: item.get("change_percent", 0), reverse=True)
+    losers.sort(key=lambda item: item.get("change_percent", 0))
+
+    top_gainers = gainers[:count]
+    top_losers = losers[:count]
+
+    # Fallback to Yahoo screener if curated universe does not yield enough movers
+    if len(top_gainers) < count:
+        fallback = _dedupe(
+            _fetch_screener("day_gainers", "US", count * 2)
+            + _fetch_screener("day_gainers", "IN", count * 2)
+        )
+        top_gainers = _dedupe(top_gainers + fallback)[:count]
+    if len(top_losers) < count:
+        fallback = _dedupe(
+            _fetch_screener("day_losers", "US", count * 2)
+            + _fetch_screener("day_losers", "IN", count * 2)
+        )
+        top_losers = _dedupe(top_losers + fallback)[:count]
+
     return top_gainers, top_losers
 
 
 def get_market_news(count: int = 6) -> list[dict]:
     stories: list[dict] = []
-    for region in ("US", "IN"):
-        params = {"region": region, "lang": "en-US", "count": count}
+    seen: set[str] = set()
+    for symbol, region in NEWS_SYMBOLS.items():
         try:
-            response = requests.get(
-                YAHOO_NEWS_URL, params=params, headers=YAHOO_HEADERS, timeout=10
-            )
-            response.raise_for_status()
-        except (
-            requests.RequestException
-        ) as exc:  # pragma: no cover - network resiliency
-            logger.debug("Yahoo news fetch failed (%s): %s", region, exc)
+            news_items = yf.Ticker(symbol).news or []
+        except Exception as exc:  # pragma: no cover - network resiliency
+            logger.debug("Ticker news fetch failed (%s): %s", symbol, exc)
             continue
 
-        payload = response.json()
-        for item in payload.get("data", []) or []:
+        for item in news_items:
             title = item.get("title")
-            publisher = item.get("publisher")
-            if not title or not publisher:
+            link = item.get("link")
+            publisher = item.get("publisher") or item.get("provider")
+            if not title or not publisher or not link:
                 continue
+            uid = str(item.get("uuid") or f"{symbol}:{title}")
+            if uid in seen:
+                continue
+            seen.add(uid)
             published = item.get("providerPublishTime")
             timestamp = (
                 datetime.fromtimestamp(published).isoformat()
@@ -216,7 +313,7 @@ def get_market_news(count: int = 6) -> list[dict]:
                 {
                     "title": title,
                     "source": publisher,
-                    "link": item.get("link"),
+                    "link": link,
                     "timestamp": timestamp,
                     "region": region,
                 }

@@ -28,18 +28,24 @@ export interface MarketSummary {
     symbol: string;
     name: string;
     price: number;
+    change: number;
     change_percent: number;
+    region?: string;
   }>;
   top_losers: Array<{
     symbol: string;
     name: string;
     price: number;
+    change: number;
     change_percent: number;
+    region?: string;
   }>;
   market_news: Array<{
     title: string;
     source: string;
     timestamp: string;
+    link?: string;
+    region?: string;
   }>;
   status: string;
 }

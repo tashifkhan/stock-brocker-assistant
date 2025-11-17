@@ -23,6 +23,22 @@ function formatChange(value: number) {
   return `${value > 0 ? "+" : ""}${value.toFixed(2)}%`;
 }
 
+function formatCurrency(value: number | null | undefined, region?: string) {
+  if (value === null || value === undefined || Number.isNaN(value)) {
+    return "–";
+  }
+  const currency = region === "IN" ? "INR" : "USD";
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency,
+      maximumFractionDigits: 2,
+    }).format(value);
+  } catch (error) {
+    return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  }
+}
+
 export default function MarketSummary() {
   const [dateInput, setDateInput] = useState<string>("");
   const [watchlistInput, setWatchlistInput] = useState("AAPL,MSFT,GOOGL");
@@ -142,11 +158,24 @@ export default function MarketSummary() {
               <p className="mb-2 text-xs uppercase text-muted-foreground">Gainers</p>
               <div className="space-y-2">
                 {topGainers.slice(0, 5).map((item, index) => (
-                  <div key={`${item.symbol}-${index}`} className="flex items-center justify-between text-sm">
-                    <span className="font-medium">{item.symbol}</span>
-                    <Badge className="bg-green-100 text-green-700">
-                      {formatChange(item.change_percent)}
-                    </Badge>
+                  <div
+                    key={`${item.symbol}-${index}`}
+                    className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate font-medium leading-none">{item.symbol}</p>
+                      {item.name && (
+                        <p className="truncate text-xs text-muted-foreground">{item.name}</p>
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className="text-sm font-medium">
+                        {formatCurrency(item.price, item.region)}
+                      </span>
+                      <Badge className="bg-green-100 text-green-700">
+                        {formatChange(item.change_percent)}
+                      </Badge>
+                    </div>
                   </div>
                 ))}
                 {topGainers.length === 0 && (
@@ -158,11 +187,24 @@ export default function MarketSummary() {
               <p className="mb-2 text-xs uppercase text-muted-foreground">Losers</p>
               <div className="space-y-2">
                 {topLosers.slice(0, 5).map((item, index) => (
-                  <div key={`${item.symbol}-${index}`} className="flex items-center justify-between text-sm">
-                    <span className="font-medium">{item.symbol}</span>
-                    <Badge className="bg-red-100 text-red-700">
-                      {formatChange(item.change_percent)}
-                    </Badge>
+                  <div
+                    key={`${item.symbol}-${index}`}
+                    className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate font-medium leading-none">{item.symbol}</p>
+                      {item.name && (
+                        <p className="truncate text-xs text-muted-foreground">{item.name}</p>
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className="text-sm font-medium">
+                        {formatCurrency(item.price, item.region)}
+                      </span>
+                      <Badge className="bg-red-100 text-red-700">
+                        {formatChange(item.change_percent)}
+                      </Badge>
+                    </div>
                   </div>
                 ))}
                 {topLosers.length === 0 && (
@@ -183,9 +225,20 @@ export default function MarketSummary() {
             ) : (
               marketNews.map((story, index) => (
                 <div key={index} className="rounded-lg border p-3">
-                  <p className="text-sm font-medium">{story.title}</p>
+                  <a
+                    href={story.link ?? "#"}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-sm font-medium hover:underline"
+                  >
+                    {story.title}
+                  </a>
                   <p className="text-xs text-muted-foreground">
-                    {story.source} • {new Date(story.timestamp).toLocaleTimeString()}
+                    {story.source}
+                    {story.region ? ` • ${story.region}` : ""}
+                    {story.timestamp
+                      ? ` • ${new Date(story.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+                      : ""}
                   </p>
                 </div>
               ))

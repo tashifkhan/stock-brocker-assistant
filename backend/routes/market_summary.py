@@ -59,7 +59,9 @@ def get_daily_market_summary(
                 detail="Unable to fetch market indices from public data source.",
             )
 
-        top_gainers, top_losers = get_market_movers(count=6)
+        top_gainers, top_losers = get_market_movers(
+            count=6, target=summary_date if date_str else None
+        )
         market_news = get_market_news(count=6)
 
         return MarketSummaryResponse(
