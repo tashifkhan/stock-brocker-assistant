@@ -11,7 +11,11 @@ from services.process_pdf import convert_pdf_to_md
 from services.report_analysis.parameter_generation import generate_evaluation_parameters
 from services.report_analysis.summary_generator import generate_report_summary
 from services.report_analysis.types import EvaluationParameters
-from services.content_service import list_financial_analysis, save_financial_analysis
+from services.content_service import (
+    get_financial_analysis_by_file_id,
+    list_financial_analysis,
+    save_financial_analysis,
+)
 from models.content import FinancialAnalysisRecord
 
 router = APIRouter(prefix="/financial-data", tags=["financial-data"])
@@ -33,7 +37,7 @@ class AnalysisRequest(BaseModel):
 class AnalysisResponse(BaseModel):
     file_id: str
     filename: str
-    parameters: Optional[EvaluationParameters] = None
+    parameters: Optional[List[EvaluationParameters]] = None
     summary: Optional[str] = None
     status: str
 
@@ -117,17 +121,15 @@ async def analyze_financial_document(request: AnalysisRequest) -> AnalysisRespon
         file_info["summary"] = summary
 
         parameters_payload = (
-            parameters.model_dump()
-            if parameters and hasattr(parameters, "model_dump")
-            else parameters
+            [param.model_dump(mode="json") for param in parameters]
+            if parameters
+            else None
         )
 
         await save_financial_analysis(
             file_id=request.file_id,
             filename=file_info["filename"],
-            parameters=(
-                parameters_payload if isinstance(parameters_payload, dict) else None
-            ),
+            parameters=parameters_payload,
             summary=summary,
             status=file_info["status"],
         )
@@ -144,8 +146,40 @@ async def analyze_financial_document(request: AnalysisRequest) -> AnalysisRespon
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def _coerce_parameters(
+    payload: Optional[object],
+) -> Optional[List[EvaluationParameters]]:
+    if payload is None:
+        return None
+
+    def _to_model(item: object) -> Optional[EvaluationParameters]:
+        if isinstance(item, EvaluationParameters):
+            return item
+        if isinstance(item, dict):
+            try:
+                return EvaluationParameters.model_validate(item)
+            except Exception:
+                return None
+        return None
+
+    if isinstance(payload, list):
+        models = [model for item in payload if (model := _to_model(item))]
+        return models or None
+
+    model = _to_model(payload)
+    return [model] if model else None
+
+
+@router.get("/history", response_model=List[FinancialAnalysisRecord])
+async def get_financial_analysis_history(
+    limit: int = Query(20, ge=1, le=200),
+):
+    records = await list_financial_analysis(limit=limit)
+    return records
+
+
 @router.get("/{file_id}")
-def get_file_analysis(file_id: str) -> AnalysisResponse:
+async def get_file_analysis(file_id: str) -> AnalysisResponse:
     """
     Retrieve analysis results for a previously uploaded file.
 
@@ -155,27 +189,24 @@ def get_file_analysis(file_id: str) -> AnalysisResponse:
     Returns:
         AnalysisResponse with analysis results
     """
-    try:
-        if file_id not in uploaded_files:
-            raise HTTPException(status_code=404, detail="File not found")
-
-        file_info = uploaded_files[file_id]
-
+    file_info = uploaded_files.get(file_id)
+    if file_info:
         return AnalysisResponse(
             file_id=file_id,
             filename=file_info["filename"],
-            parameters=file_info.get("parameters"),
+            parameters=_coerce_parameters(file_info.get("parameters")),
             summary=file_info.get("summary"),
             status=file_info["status"],
         )
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    record = await get_financial_analysis_by_file_id(file_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="File not found")
 
-
-@router.get("/history", response_model=List[FinancialAnalysisRecord])
-async def get_financial_analysis_history(
-    limit: int = Query(20, ge=1, le=200),
-):
-    records = await list_financial_analysis(limit=limit)
-    return records
+    return AnalysisResponse(
+        file_id=record.file_id,
+        filename=record.filename,
+        parameters=_coerce_parameters(record.parameters),
+        summary=record.summary,
+        status=record.status,
+    )

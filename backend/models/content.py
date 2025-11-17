@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -49,8 +49,8 @@ class MarketFilingRecord(MongoModel):
 class ReportAnalysisRecord(MongoModel):
     id: PyObjectId = Field(alias="_id")
     report: str
-    parameters: dict
-    evaluation: Optional[dict] = None
+    parameters: Union[Dict[str, Any], List[Dict[str, Any]]]
+    evaluation: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]] = None
     summary: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -59,7 +59,7 @@ class FinancialAnalysisRecord(MongoModel):
     id: PyObjectId = Field(alias="_id")
     file_id: str
     filename: str
-    parameters: Optional[dict] = None
+    parameters: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]] = None
     summary: Optional[str] = None
     status: str
     created_at: datetime = Field(default_factory=datetime.utcnow)

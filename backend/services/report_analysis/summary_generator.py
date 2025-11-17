@@ -1,10 +1,11 @@
 from .types import EvaluationParameters
 from .constants import client
 from google.genai import types
+import json
 import re
 
 
-def generate_report_summary(report: str, parameters: EvaluationParameters) -> str:
+def generate_report_summary(report: str, parameters: list[EvaluationParameters]) -> str:
     """
     Generates a detailed summary of a financial report using Google GenAI.
 
@@ -16,9 +17,13 @@ def generate_report_summary(report: str, parameters: EvaluationParameters) -> st
         str: The generated summary.
     """
 
+    parameters_json = json.dumps(
+        [param.model_dump(mode="json") for param in parameters], indent=2
+    )
+
     prompt = f"""
     As a financial expert, generate a detailed summary of this report make sure to includes these parameters:
-    {parameters.model_dump_json(indent=2)}
+    {parameters_json}
 
     Report:
     {report}
@@ -44,5 +49,4 @@ def generate_report_summary(report: str, parameters: EvaluationParameters) -> st
     else:
         output = text
 
-    print(output)
     return output

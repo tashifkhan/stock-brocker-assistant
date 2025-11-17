@@ -10,9 +10,28 @@ except ImportError:  # pragma: no cover - optional dependency
     Document = None  # type: ignore
 
 try:
-    import pymupdf4llm as fitz  # type: ignore
-except ImportError:  # pragma: no cover - fallback when pymupdf4llm not available
     import fitz  # type: ignore
+except ImportError:  # pragma: no cover - fallback when pymupdf/fitz not available
+    try:
+        from pymupdf4llm import fitz as fitz  # type: ignore
+    except ImportError:  # pragma: no cover - ultimate fallback
+        import pymupdf4llm as fitz  # type: ignore
+
+if not hasattr(fitz, "open"):
+    if hasattr(fitz, "Document"):
+
+        def _open_document(path: str):
+            return fitz.Document(path)  # type: ignore[attr-defined]
+
+        setattr(fitz, "open", _open_document)
+    elif hasattr(fitz, "from_file"):
+
+        def _open_from_file(path: str):
+            return fitz.from_file(path)  # type: ignore[attr-defined]
+
+        setattr(fitz, "open", _open_from_file)
+    else:
+        raise AttributeError("Loaded PyMuPDF variant does not expose an 'open' method.")
 
 
 """
@@ -143,9 +162,9 @@ def convert_pdf_to_md(
                         if not raw_line:
                             continue
 
-                        if re.match(r"^[\u2022\u2023\u25E6\u2043\-\*\o]\s+", raw_line):
+                        if re.match(r"^[\-\u2022\u2023\u25E6\u2043*o]\s+", raw_line):
                             bullet_text = re.sub(
-                                r"^[\u2022\u2023\u25E6\u2043\-\*\o]\s+", "", raw_line
+                                r"^[\-\u2022\u2023\u25E6\u2043*o]\s+", "", raw_line
                             )
                             md_lines.append(f"- {bullet_text}")
                             continue

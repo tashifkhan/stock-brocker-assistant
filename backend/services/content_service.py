@@ -1,6 +1,7 @@
 import asyncio
 from datetime import datetime
-from typing import Iterable, List, Optional
+from enum import Enum
+from typing import Any, Dict, Iterable, List, Optional, Union
 from urllib.parse import urlparse
 
 from bson import ObjectId
@@ -124,15 +125,19 @@ async def list_market_filings(
 
 async def save_report_analysis(
     report: str,
-    parameters: dict,
-    evaluation: Optional[dict],
+    parameters: Any,
+    evaluation: Optional[Any],
     summary: Optional[str],
 ) -> ReportAnalysisRecord:
     now = datetime.utcnow()
     document = {
         "report": report,
-        "parameters": parameters,
-        "evaluation": evaluation,
+        "parameters": (
+            _normalize_parameters(parameters) if parameters is not None else None
+        ),
+        "evaluation": (
+            _normalize_parameters(evaluation) if evaluation is not None else None
+        ),
         "summary": summary,
         "created_at": now,
     }
@@ -147,13 +152,49 @@ async def list_report_analysis(limit: int = 20) -> List[ReportAnalysisRecord]:
         return list(cursor)
 
     docs = await asyncio.to_thread(_fetch)
-    return [ReportAnalysisRecord(**doc) for doc in docs]
+    normalized = []
+    for doc in docs:
+        if "parameters" in doc and doc["parameters"] is not None:
+            doc["parameters"] = _normalize_parameters(doc["parameters"])
+        if "evaluation" in doc and doc["evaluation"] is not None:
+            doc["evaluation"] = _normalize_parameters(doc["evaluation"])
+        normalized.append(ReportAnalysisRecord(**doc))
+    return normalized
+
+
+async def get_financial_analysis_by_file_id(
+    file_id: str,
+) -> Optional[FinancialAnalysisRecord]:
+    def _fetch():
+        return financial_analysis_collection.find_one({"file_id": file_id})
+
+    doc = await asyncio.to_thread(_fetch)
+    if not doc:
+        return None
+    if "parameters" in doc and doc["parameters"] is not None:
+        doc["parameters"] = _normalize_parameters(doc["parameters"])
+    if "evaluation" in doc and doc["evaluation"] is not None:
+        doc["evaluation"] = _normalize_parameters(doc["evaluation"])
+    return FinancialAnalysisRecord(**doc)
+
+
+ParameterPayload = Optional[Union[Dict[str, Any], List[Dict[str, Any]]]]
+
+
+def _normalize_parameters(value: Any) -> Any:
+    if isinstance(value, Enum):
+        return value.value
+    if isinstance(value, dict):
+        return {k: _normalize_parameters(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_normalize_parameters(item) for item in value]
+    return value
 
 
 async def save_financial_analysis(
     file_id: str,
     filename: str,
-    parameters: Optional[dict],
+    parameters: ParameterPayload,
     summary: Optional[str],
     status: str,
 ) -> FinancialAnalysisRecord:
@@ -161,7 +202,9 @@ async def save_financial_analysis(
     document = {
         "file_id": file_id,
         "filename": filename,
-        "parameters": parameters,
+        "parameters": (
+            _normalize_parameters(parameters) if parameters is not None else None
+        ),
         "summary": summary,
         "status": status,
         "updated_at": now,
@@ -188,7 +231,12 @@ async def list_financial_analysis(limit: int = 20) -> List[FinancialAnalysisReco
         return list(cursor)
 
     docs = await asyncio.to_thread(_fetch)
-    return [FinancialAnalysisRecord(**doc) for doc in docs]
+    normalized = []
+    for doc in docs:
+        if "parameters" in doc and doc["parameters"] is not None:
+            doc["parameters"] = _normalize_parameters(doc["parameters"])
+        normalized.append(FinancialAnalysisRecord(**doc))
+    return normalized
 
 
 async def get_watchlist(user_id: PyObjectId) -> WatchlistRecord:

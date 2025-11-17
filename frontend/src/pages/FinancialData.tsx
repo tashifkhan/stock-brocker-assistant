@@ -1,4 +1,4 @@
-import { ChangeEvent, useRef, useState } from "react";
+import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,11 +15,17 @@ import {
 import {
   useUploadFinancialDocument,
   useAnalyzeDocument,
+  useFinancialAnalysisHistory,
+  useGetDocumentAnalysis,
 } from "@/hooks/useApi";
-import type { AnalysisResult } from "@/lib/api";
+import type {
+  AnalysisResult,
+  EvaluationParameters,
+  FinancialAnalysisRecord,
+} from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
-function formatDate(date = new Date()) {
+function formatDate(date: string | number | Date = new Date()) {
   return new Date(date).toLocaleString();
 }
 
@@ -28,12 +34,47 @@ export default function FinancialData() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
   const [currentAnalysis, setCurrentAnalysis] = useState<AnalysisResult | null>(null);
-  const [analysisHistory, setAnalysisHistory] = useState<AnalysisResult[]>([]);
+  const [selectedAnalysisId, setSelectedAnalysisId] = useState<string | null>(null);
   const uploadMutation = useUploadFinancialDocument();
   const analyzeMutation = useAnalyzeDocument();
+  const historyQuery = useFinancialAnalysisHistory(20);
+  const selectedAnalysisQuery = useGetDocumentAnalysis(selectedAnalysisId ?? "");
   const { toast } = useToast();
 
+  const history: FinancialAnalysisRecord[] = historyQuery.data ?? [];
+  const activeAnalysis = selectedAnalysisQuery.data ?? currentAnalysis;
+  const activeFileId = activeAnalysis?.file_id ?? selectedAnalysisId ?? null;
+  const selectedHistoryRecord = activeFileId
+    ? history.find((record) => record.file_id === activeFileId)
+    : undefined;
   const isProcessing = uploadMutation.isPending || analyzeMutation.isPending;
+  const isAnalysisLoading = selectedAnalysisQuery.isFetching && !currentAnalysis;
+  const parameterEntries: EvaluationParameters[] = activeAnalysis?.parameters
+    ? Array.isArray(activeAnalysis.parameters)
+      ? activeAnalysis.parameters
+      : [activeAnalysis.parameters]
+    : [];
+  const shouldShowAnalysisCard = Boolean(activeAnalysis) || isAnalysisLoading;
+
+  const handleHistorySelect = (fileId: string) => {
+    setSelectedAnalysisId(fileId);
+    setCurrentAnalysis((prev) => (prev?.file_id === fileId ? prev : null));
+  };
+
+  useEffect(() => {
+    if (!selectedAnalysisId && history.length > 0) {
+      setSelectedAnalysisId(history[0].file_id);
+    }
+  }, [selectedAnalysisId, history]);
+
+  useEffect(() => {
+    if (
+      selectedAnalysisQuery.data &&
+      currentAnalysis?.file_id === selectedAnalysisQuery.data.file_id
+    ) {
+      setCurrentAnalysis(null);
+    }
+  }, [selectedAnalysisQuery.data, currentAnalysis]);
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -70,12 +111,8 @@ export default function FinancialData() {
       );
 
       setCurrentAnalysis(analysisResponse);
-      setAnalysisHistory((prev) => {
-        const filtered = prev.filter(
-          (item) => item.file_id !== analysisResponse.file_id
-        );
-        return [analysisResponse, ...filtered];
-      });
+      setSelectedAnalysisId(analysisResponse.file_id);
+      await historyQuery.refetch();
       toast({
         title: "Analysis ready",
         description: "The financial report summary has been generated.",
@@ -179,92 +216,114 @@ export default function FinancialData() {
         </CardContent>
       </Card>
 
-      {currentAnalysis && (
+      {shouldShowAnalysisCard && (
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center justify-between flex-wrap gap-3">
               <CardTitle className="flex items-center space-x-2">
                 <TrendingUp className="h-5 w-5 text-primary" />
-                <span>Latest Analysis</span>
+                <span>Analysis Details</span>
               </CardTitle>
-              <Badge variant="secondary" className="flex items-center gap-1">
-                <CheckCircle className="h-3 w-3" />
-                Processed {formatDate()}
-              </Badge>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Badge variant="secondary" className="flex items-center gap-1 text-xs">
+                  {isAnalysisLoading ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <CheckCircle className="h-3 w-3" />
+                  )}
+                  {(selectedHistoryRecord?.status ?? activeAnalysis?.status ?? "pending")
+                    .replace(/_/g, " ")
+                    .replace(/\b\w/g, (char) => char.toUpperCase())}
+                </Badge>
+                <span>
+                  {selectedHistoryRecord
+                    ? `Updated ${formatDate(selectedHistoryRecord.updated_at ?? selectedHistoryRecord.created_at)}`
+                    : `Processed ${formatDate()}`}
+                </span>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="rounded-lg border bg-muted/10 p-4">
-              <p className="text-sm text-muted-foreground mb-2">
-                File: <span className="font-medium text-foreground">{currentAnalysis.filename}</span>
-              </p>
-              <p className="leading-relaxed text-sm">
-                {currentAnalysis.summary ?? "No summary generated for this document."}
-              </p>
-            </div>
+            {isAnalysisLoading && !activeAnalysis ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading analysis details...
+              </div>
+            ) : (
+              <>
+                <div className="rounded-lg border bg-muted/10 p-4">
+                  <p className="text-sm text-muted-foreground mb-2">
+                    File: <span className="font-medium text-foreground">{activeAnalysis?.filename}</span>
+                  </p>
+                  <p className="leading-relaxed text-sm">
+                    {activeAnalysis?.summary ?? "No summary generated for this document."}
+                  </p>
+                </div>
 
-            {currentAnalysis.parameters && (
-              <Card className="bg-card/60">
-                <CardHeader>
-                  <CardTitle className="text-base">Key Parameter</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2 text-sm">
-                  <div className="grid gap-2 md:grid-cols-2">
-                    <div>
-                      <p className="font-medium text-foreground">Name</p>
-                      <p className="text-muted-foreground">
-                        {currentAnalysis.parameters.parameter_name}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="font-medium text-foreground">Importance</p>
-                      <p className="text-muted-foreground">
-                        {currentAnalysis.parameters.importance}
-                      </p>
-                    </div>
+                {parameterEntries.length > 0 && (
+                  <div className="space-y-4">
+                    {parameterEntries.map((parameter, index) => (
+                      <div
+                        key={`${parameter.parameter_name}-${index}`}
+                        className="rounded-lg border bg-card/60 p-4 text-sm space-y-3"
+                      >
+                        <div className="grid gap-2 md:grid-cols-2">
+                          <div>
+                            <p className="font-medium text-foreground">Name</p>
+                            <p className="text-muted-foreground">{parameter.parameter_name}</p>
+                          </div>
+                          <div>
+                            <p className="font-medium text-foreground">Importance</p>
+                            <p className="text-muted-foreground">{parameter.importance}</p>
+                          </div>
+                        </div>
+                        <div>
+                          <p className="font-medium text-foreground">Definition</p>
+                          <p className="text-muted-foreground">{parameter.definition}</p>
+                        </div>
+                        <div>
+                          <p className="font-medium text-foreground">Interpretation</p>
+                          <p className="text-muted-foreground">{parameter.interpretation}</p>
+                        </div>
+                        {parameter.benchmark_or_note && (
+                          <div>
+                            <p className="font-medium text-foreground">Benchmark / Note</p>
+                            <p className="text-muted-foreground">{parameter.benchmark_or_note}</p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                  <div>
-                    <p className="font-medium text-foreground">Definition</p>
-                    <p className="text-muted-foreground">
-                      {currentAnalysis.parameters.definition}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground">Interpretation</p>
-                    <p className="text-muted-foreground">
-                      {currentAnalysis.parameters.interpretation}
-                    </p>
-                  </div>
-                  {currentAnalysis.parameters.benchmark_or_note && (
-                    <div>
-                      <p className="font-medium text-foreground">Benchmark / Note</p>
-                      <p className="text-muted-foreground">
-                        {currentAnalysis.parameters.benchmark_or_note}
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                )}
+
+                <div className="flex flex-wrap gap-3">
+                  <Button variant="outline" size="sm" disabled>
+                    <Download className="mr-2 h-4 w-4" />
+                    Download report
+                  </Button>
+                </div>
+              </>
             )}
-
-            <div className="flex flex-wrap gap-3">
-              <Button variant="outline" size="sm">
-                <Download className="mr-2 h-4 w-4" />
-                Download report
-              </Button>
-            </div>
           </CardContent>
         </Card>
       )}
 
       <Card>
         <CardHeader>
-          <CardTitle>Analysis History (current session)</CardTitle>
+          <CardTitle>Analysis History</CardTitle>
         </CardHeader>
         <CardContent>
-          {analysisHistory.length === 0 ? (
+          {historyQuery.isError ? (
+            <p className="text-sm text-destructive">
+              {historyQuery.error instanceof Error
+                ? historyQuery.error.message
+                : "Unable to load analysis history."}
+            </p>
+          ) : historyQuery.isLoading ? (
+            <p className="text-sm text-muted-foreground">Loading analysis history...</p>
+          ) : history.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Upload a PDF to see a running history of analyses.
+              Upload a PDF to view your analysis history.
             </p>
           ) : (
             <Table>
@@ -272,30 +331,43 @@ export default function FinancialData() {
                 <TableRow>
                   <TableHead>File</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Updated</TableHead>
                   <TableHead>Summary</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {analysisHistory.map((analysis) => (
-                  <TableRow key={analysis.file_id}>
-                    <TableCell className="font-medium">
-                      {analysis.filename}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{analysis.status}</Badge>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {analysis.summary ? analysis.summary.slice(0, 160) + (analysis.summary.length > 160 ? "…" : "") : "No summary available"}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {history.map((analysis) => {
+                  const isSelected = selectedAnalysisId === analysis.file_id;
+                  const updatedAt = analysis.updated_at ?? analysis.created_at;
+                  const summary = analysis.summary ?? "No summary available";
+                  return (
+                    <TableRow
+                      key={analysis.file_id}
+                      className={`${isSelected ? "bg-muted/50" : ""} cursor-pointer`}
+                      onClick={() => handleHistorySelect(analysis.file_id)}
+                    >
+                      <TableCell className="font-medium">{analysis.filename}</TableCell>
+                      <TableCell>
+                        <Badge variant={isSelected ? "secondary" : "outline"}>
+                          {analysis.status.replace(/_/g, " ")}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {updatedAt ? formatDate(updatedAt) : "—"}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {summary.length > 160 ? `${summary.slice(0, 157)}…` : summary}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}
         </CardContent>
       </Card>
 
-      {!currentAnalysis && (
+      {!shouldShowAnalysisCard && history.length === 0 && (
         <Card>
           <CardHeader>
             <CardTitle>What to expect from an analysis?</CardTitle>

@@ -6,7 +6,7 @@ import re
 import json
 
 
-def generate_evaluation_parameters(report: str) -> EvaluationParameters | None:
+def generate_evaluation_parameters(report: str) -> list[EvaluationParameters] | None:
     """
     Generates evaluation parameters for a financial report using Google GenAI.
 
@@ -28,14 +28,14 @@ Your task:
 
 Response structure (required):
 [
-  {
-    "parameter_name": "<string>",
-    "definition": "<string>",
-    "importance": "<string>",
-    "interpretation": "Increase = <positive/negative>, Decrease = <positive/negative>",
-    "benchmark_or_note": "<optional>"
-  },
-  ...
+    {{
+        "parameter_name": "<string>",
+        "definition": "<string>",
+        "importance": "<string>",
+        "interpretation": "Increase = <positive/negative>, Decrease = <positive/negative>",
+        "benchmark_or_note": "<optional>"
+    }},
+    ...
 ]
 
 Fallback Parameter List (used only if sector cannot be inferred):
@@ -111,4 +111,19 @@ Output only in structured JSON format — no narrative explanation.
         except Exception:
             return None
 
-    return EvaluationParameters(**parsed)
+    if isinstance(parsed, dict):
+        parsed = [parsed]
+
+    if not isinstance(parsed, list):
+        return None
+
+    parameters: list[EvaluationParameters] = []
+    for item in parsed:
+        if not isinstance(item, dict):
+            continue
+        try:
+            parameters.append(EvaluationParameters.model_validate(item))
+        except Exception:
+            continue
+
+    return parameters or None

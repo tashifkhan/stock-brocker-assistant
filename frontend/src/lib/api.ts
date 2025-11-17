@@ -54,9 +54,20 @@ export interface FileUploadResponse {
 export interface AnalysisResult {
   file_id: string;
   filename: string;
-  parameters: EvaluationParameters | null;
+  parameters: EvaluationParameters | EvaluationParameters[] | null;
   summary: string | null;
   status: string;
+}
+
+export interface FinancialAnalysisRecord {
+  _id?: string;
+  file_id: string;
+  filename: string;
+  parameters?: EvaluationParameters | EvaluationParameters[] | null;
+  summary?: string | null;
+  status: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface EvaluationParameters {
@@ -246,6 +257,17 @@ export const financialDataApi = {
 
   getAnalysis: (fileId: string) => {
     return apiCall<AnalysisResult>(`/financial-data/${fileId}`);
+  },
+
+  history: (limit: number = 20) => {
+    const params = new URLSearchParams();
+    if (typeof limit === "number") {
+      params.set("limit", limit.toString());
+    }
+    const query = params.toString();
+    return apiCall<FinancialAnalysisRecord[]>(
+      `/financial-data/history${query ? `?${query}` : ""}`
+    );
   },
 };
 

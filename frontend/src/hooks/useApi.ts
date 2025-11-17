@@ -61,6 +61,7 @@ export function useUploadFinancialDocument() {
     mutationFn: (file: File) => financialDataApi.upload(file),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["financialData"] });
+      queryClient.invalidateQueries({ queryKey: ["financialData", "history"] });
     },
   });
 }
@@ -73,6 +74,7 @@ export function useAnalyzeDocument() {
       queryClient.invalidateQueries({
         queryKey: ["financialData", data.file_id],
       });
+      queryClient.invalidateQueries({ queryKey: ["financialData", "history"] });
     },
   });
 }
@@ -84,6 +86,15 @@ export function useGetDocumentAnalysis(fileId: string) {
     enabled: !!fileId,
     staleTime: 10 * 60 * 1000,
     gcTime: 60 * 60 * 1000,
+  });
+}
+
+export function useFinancialAnalysisHistory(limit: number = 20) {
+  return useQuery({
+    queryKey: ["financialData", "history", limit],
+    queryFn: () => financialDataApi.history(limit),
+    staleTime: 2 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
   });
 }
 

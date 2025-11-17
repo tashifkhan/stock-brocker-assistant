@@ -142,14 +142,14 @@ async def generate_parameters(request: ReportRequest) -> dict:
                 detail="Failed to generate evaluation parameters. Please check the report format.",
             )
 
+        parameters_payload = []
+        if parameters:
+            parameters_payload = [param.model_dump(mode="json") for param in parameters]
+
         return {
             "status": "success",
             "message": "Successfully generated evaluation parameters",
-            "parameters": (
-                parameters.model_dump()
-                if hasattr(parameters, "model_dump")
-                else parameters
-            ),
+            "parameters": parameters_payload,
         }
 
     except Exception as e:
@@ -197,17 +197,14 @@ async def generate_summary(request: SummaryRequest) -> dict:
         Dictionary containing the generated summary
     """
     try:
-        # Convert list of parameters to a single EvaluationParameters object for the summary
-        # For now, we'll pass the first parameter or create a combined representation
         if not request.parameters:
             raise HTTPException(
                 status_code=400,
                 detail="At least one parameter is required for summary generation",
             )
 
-        # Use the first parameter for now, or you can modify summary_generator to accept a list
         report_content = await _get_report_content(request.report, request.file_id)
-        summary = generate_report_summary(report_content, request.parameters[0])
+        summary = generate_report_summary(report_content, request.parameters)
 
         return {
             "status": "success",
@@ -239,20 +236,18 @@ async def full_analysis(request: ReportRequest) -> dict:
         report_content = await _get_report_content(request.report, request.file_id)
         parameters = generate_evaluation_parameters(report_content)
 
-        if parameters is None:
+        if not parameters:
             raise HTTPException(
                 status_code=400, detail="Failed to generate evaluation parameters"
             )
 
-        # Step 2: Evaluate the parameter
+        # Step 2: Evaluate the parameters (returns list)
         evaluation = generate_evaluated_parameter_code(report_content, parameters)
 
         # Step 3: Generate summary
         summary = generate_report_summary(report_content, parameters)
 
-        parameters_payload = (
-            parameters.model_dump() if hasattr(parameters, "model_dump") else parameters
-        )
+        parameters_payload = [param.model_dump(mode="json") for param in parameters]
 
         response_payload = {
             "status": "success",
@@ -262,17 +257,11 @@ async def full_analysis(request: ReportRequest) -> dict:
             "summary": summary,
         }
 
-        parameters_dict = (
-            parameters_payload if isinstance(parameters_payload, dict) else {}
-        )
-
-        evaluation_payload = (
-            evaluation if isinstance(evaluation, dict) else {"value": evaluation}
-        )
+        evaluation_payload = evaluation
 
         await save_report_analysis(
             report=report_content,
-            parameters=parameters_dict,
+            parameters=parameters_payload,
             evaluation=evaluation_payload,
             summary=summary,
         )
