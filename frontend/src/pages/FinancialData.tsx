@@ -1,4 +1,7 @@
 import { ChangeEvent, useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -315,10 +318,13 @@ export default function FinancialData() {
                       {activeAnalysis?.filename}
                     </p>
                     <Separator className="mb-3" />
-                    <div className="prose prose-sm max-w-none">
-                      <p className="leading-relaxed text-sm text-foreground/90">
+                    <div className="prose prose-sm max-w-none dark:prose-invert leading-relaxed text-sm text-foreground/90">
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        rehypePlugins={[rehypeRaw]}
+                      >
                         {activeAnalysis?.summary ?? "No summary generated for this document."}
-                      </p>
+                      </ReactMarkdown>
                     </div>
                   </div>
                 </div>
@@ -365,24 +371,40 @@ export default function FinancialData() {
                                 <div className="grid gap-4 md:grid-cols-2">
                                   <div className="space-y-1">
                                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Importance</p>
-                                    <p className="text-sm text-foreground">{parameter.importance}</p>
+                                    <div className="text-sm text-foreground prose prose-sm dark:prose-invert max-w-none">
+                                      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+                                        {parameter.importance}
+                                      </ReactMarkdown>
+                                    </div>
                                   </div>
                                   <div className="space-y-1">
                                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Interpretation</p>
-                                    <p className="text-sm text-foreground">{parameter.interpretation}</p>
+                                    <div className="text-sm text-foreground prose prose-sm dark:prose-invert max-w-none">
+                                      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+                                        {parameter.interpretation}
+                                      </ReactMarkdown>
+                                    </div>
                                   </div>
                                 </div>
                                 <Separator />
                                 <div className="space-y-1">
                                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Definition</p>
-                                  <p className="text-sm text-foreground leading-relaxed">{parameter.definition}</p>
+                                  <div className="text-sm text-foreground leading-relaxed prose prose-sm dark:prose-invert max-w-none">
+                                    <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+                                      {parameter.definition}
+                                    </ReactMarkdown>
+                                  </div>
                                 </div>
                                 {parameter.benchmark_or_note && (
                                   <>
                                     <Separator />
                                     <div className="space-y-1">
                                       <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Benchmark / Note</p>
-                                      <p className="text-sm text-foreground leading-relaxed">{parameter.benchmark_or_note}</p>
+                                      <div className="text-sm text-foreground leading-relaxed prose prose-sm dark:prose-invert max-w-none">
+                                        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+                                          {parameter.benchmark_or_note}
+                                        </ReactMarkdown>
+                                      </div>
                                     </div>
                                   </>
                                 )}
