@@ -296,24 +296,24 @@ export default function Editorial() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-bold text-foreground">Editorial Assistant</h1>
-        <p className="text-muted-foreground">
+      <div className="space-y-3">
+        <h1 className="text-3xl font-bold tracking-tight">Editorial Assistant</h1>
+        <p className="text-lg text-muted-foreground">
           Generate actionable suggestions, review house guidelines, and track content performance from a single workspace.
         </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <PenTool className="h-5 w-5" />
+          <CardTitle className="flex items-center gap-2">
+            <PenTool className="h-5 w-5 text-primary" />
             <span>Request suggestions</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={handleSubmit}>
-            <div className="grid gap-3 md:grid-cols-[2fr_1fr]">
-              <div className="space-y-1">
+            <div className="grid gap-4 md:grid-cols-[2fr_1fr]">
+              <div className="space-y-2">
                 <label htmlFor="editorial-text" className="text-sm font-medium">
                   Draft text
                 </label>
@@ -323,28 +323,34 @@ export default function Editorial() {
                   onChange={(event) => setText(event.target.value)}
                   rows={6}
                   placeholder="Paste content that needs polishing..."
+                  className="resize-none"
                 />
               </div>
               <div className="space-y-3">
-                <div className="space-y-1">
+                <div className="space-y-2">
                   <label htmlFor="content-type" className="text-sm font-medium">
                     Content type
                   </label>
-                  <select
-                    id="content-type"
+                  <Select
                     value={contentType}
-                    onChange={(event) => setContentType(event.target.value)}
-                    className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    onValueChange={(value) => setContentType(value)}
                   >
-                    {contentTypes.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger id="content-type">
+                      <SelectValue placeholder="Select content type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {contentTypes.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-sm font-medium">Tone preference (optional)</label>
+                <div className="space-y-2">
+                  <label htmlFor="suggestion-tone" className="text-sm font-medium">
+                    Tone preference
+                  </label>
                   <Select
                     value={suggestionToneValue}
                     onValueChange={(value) => setSuggestionToneValue(value)}
@@ -362,14 +368,15 @@ export default function Editorial() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-2">
                   <label htmlFor="word-count" className="text-sm font-medium">
-                    Word count (optional)
+                    Word count
                   </label>
                   <Input
                     id="word-count"
-                    value={text.trim() ? String(text.trim().split(/\s+/).length) : ""}
+                    value={text.trim() ? String(text.trim().split(/\s+/).length) : "0"}
                     readOnly
+                    className="bg-muted"
                   />
                 </div>
               </div>
@@ -396,19 +403,22 @@ export default function Editorial() {
           )}
 
           {suggestionData && suggestionData.suggestions.length > 0 && (
-            <div className="mt-6 space-y-3">
-              <h3 className="text-sm font-semibold uppercase text-muted-foreground">
-                Suggested improvements
-              </h3>
-              <div className="space-y-2">
+            <div className="mt-6 space-y-4">
+              <div className="flex items-center gap-2">
+                <Lightbulb className="h-4 w-4 text-primary" />
+                <h3 className="text-sm font-semibold uppercase text-muted-foreground">
+                  Suggested improvements
+                </h3>
+              </div>
+              <div className="space-y-3">
                 {suggestionData.suggestions.map((suggestion, index) => (
-                  <div key={`${suggestion}-${index}`} className="border rounded-lg p-3">
-                    <p className="text-sm">{suggestion}</p>
+                  <div key={`${suggestion}-${index}`} className="rounded-lg border bg-card p-4 shadow-sm">
+                    <p className="text-sm leading-relaxed">{suggestion}</p>
                   </div>
                 ))}
               </div>
               <p className="text-xs text-muted-foreground">
-                Original text preserved for reference. Content type analysed: {suggestionData.content_type}.
+                Content type: <span className="font-medium">{suggestionData.content_type}</span>
               </p>
             </div>
           )}
@@ -416,7 +426,7 @@ export default function Editorial() {
       </Card>
 
       <Tabs defaultValue="context" className="space-y-4">
-        <TabsList>
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="context">Context</TabsTrigger>
           <TabsTrigger value="style">Style guide</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
@@ -426,16 +436,25 @@ export default function Editorial() {
         <TabsContent value="context">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Newspaper className="h-5 w-5" />
+              <CardTitle className="flex items-center gap-2">
+                <Newspaper className="h-5 w-5 text-primary" />
                 <span>Editorial context</span>
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="secondary">Articles: {contextTotals.articles}</Badge>
-                <Badge variant="secondary">Reports: {contextTotals.reports}</Badge>
-                <Badge variant="secondary">Filings: {contextTotals.filings}</Badge>
+            <CardContent className="space-y-6">
+              <div className="flex flex-wrap items-center gap-3">
+                <Badge variant="secondary" className="px-3 py-1">
+                  <FileText className="mr-1.5 h-3 w-3" />
+                  Articles: {contextTotals.articles}
+                </Badge>
+                <Badge variant="secondary" className="px-3 py-1">
+                  <ClipboardList className="mr-1.5 h-3 w-3" />
+                  Reports: {contextTotals.reports}
+                </Badge>
+                <Badge variant="secondary" className="px-3 py-1">
+                  <BookOpen className="mr-1.5 h-3 w-3" />
+                  Filings: {contextTotals.filings}
+                </Badge>
                 <Button
                   type="button"
                   size="sm"
@@ -444,8 +463,8 @@ export default function Editorial() {
                   disabled={contextLoading}
                   className="ml-auto"
                 >
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Refresh context
+                  <RefreshCw className={`mr-2 h-4 w-4 ${contextLoading ? 'animate-spin' : ''}`} />
+                  Refresh
                 </Button>
               </div>
 
@@ -467,32 +486,37 @@ export default function Editorial() {
               ) : (
                 <div className="space-y-6">
                   {contextData.market_brief && (
-                    <Alert>
+                    <Alert className="border-primary/50 bg-primary/5">
+                      <Lightbulb className="h-4 w-4 text-primary" />
                       <AlertTitle>Suggested market brief</AlertTitle>
-                      <AlertDescription>{contextData.market_brief}</AlertDescription>
+                      <AlertDescription className="text-sm">{contextData.market_brief}</AlertDescription>
                     </Alert>
                   )}
 
-                  <section className="space-y-3">
-                    <h3 className="text-sm font-semibold uppercase text-muted-foreground">
-                      Recent articles
-                    </h3>
+                  <section className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-primary" />
+                      <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                        Recent articles
+                      </h3>
+                    </div>
                     <div className="grid gap-3 lg:grid-cols-2">
                       {contextData.articles.map((article) => (
-                        <div key={article.id} className="flex items-start gap-3 rounded-lg border p-3">
+                        <div key={article.id} className="group flex items-start gap-3 rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md">
                           <Checkbox
                             checked={selectedArticleIds.includes(article.id)}
                             onCheckedChange={(checked) =>
                               handleSelectionUpdate(article.id, checked, setSelectedArticleIds)
                             }
                             aria-label={`Select article ${article.title}`}
+                            className="mt-1"
                           />
-                          <div className="space-y-1">
+                          <div className="flex-1 space-y-2">
                             <div className="flex flex-wrap items-center gap-2">
-                              <span className="text-sm font-medium">{article.title}</span>
-                              {article.source && <Badge variant="outline">{article.source}</Badge>}
+                              <span className="text-sm font-medium leading-tight">{article.title}</span>
+                              {article.source && <Badge variant="outline" className="text-xs">{article.source}</Badge>}
                             </div>
-                            <p className="text-sm text-muted-foreground">{article.summary}</p>
+                            <p className="text-sm text-muted-foreground leading-relaxed">{article.summary}</p>
                             {article.publish_date && (
                               <p className="text-xs text-muted-foreground">Published: {article.publish_date}</p>
                             )}
@@ -507,24 +531,28 @@ export default function Editorial() {
                     )}
                   </section>
 
-                  <section className="space-y-3">
-                    <h3 className="text-sm font-semibold uppercase text-muted-foreground">
-                      Saved report analysis
-                    </h3>
+                  <section className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <ClipboardList className="h-4 w-4 text-primary" />
+                      <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                        Saved report analysis
+                      </h3>
+                    </div>
                     <div className="grid gap-3 lg:grid-cols-2">
                       {contextData.reports.map((report) => (
-                        <div key={report.id} className="flex items-start gap-3 rounded-lg border p-3">
+                        <div key={report.id} className="group flex items-start gap-3 rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md">
                           <Checkbox
                             checked={selectedReportIds.includes(report.id)}
                             onCheckedChange={(checked) =>
                               handleSelectionUpdate(report.id, checked, setSelectedReportIds)
                             }
                             aria-label="Select report highlight"
+                            className="mt-1"
                           />
-                          <div className="space-y-1">
-                            <span className="text-sm font-medium">{report.summary}</span>
+                          <div className="flex-1 space-y-2">
+                            <span className="text-sm font-medium leading-tight">{report.summary}</span>
                             {report.parameter_highlights.length > 0 && (
-                              <ul className="list-disc pl-4 text-xs text-muted-foreground">
+                              <ul className="list-disc space-y-1 pl-4 text-xs text-muted-foreground">
                                 {report.parameter_highlights.map((highlight, index) => (
                                   <li key={`${report.id}-highlight-${index}`}>{highlight}</li>
                                 ))}
@@ -542,27 +570,31 @@ export default function Editorial() {
                     )}
                   </section>
 
-                  <section className="space-y-3">
-                    <h3 className="text-sm font-semibold uppercase text-muted-foreground">
-                      Regulatory filings
-                    </h3>
+                  <section className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <BookOpen className="h-4 w-4 text-primary" />
+                      <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                        Regulatory filings
+                      </h3>
+                    </div>
                     <div className="grid gap-3 lg:grid-cols-2">
                       {contextData.filings.map((filing) => (
-                        <div key={filing.id} className="flex items-start gap-3 rounded-lg border p-3">
+                        <div key={filing.id} className="group flex items-start gap-3 rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md">
                           <Checkbox
                             checked={selectedFilingIds.includes(filing.id)}
                             onCheckedChange={(checked) =>
                               handleSelectionUpdate(filing.id, checked, setSelectedFilingIds)
                             }
                             aria-label={`Select filing ${filing.title}`}
+                            className="mt-1"
                           />
-                          <div className="space-y-1">
+                          <div className="flex-1 space-y-2">
                             <div className="flex flex-wrap items-center gap-2">
-                              <span className="text-sm font-medium">{filing.title}</span>
-                              {filing.source && <Badge variant="outline">{filing.source}</Badge>}
+                              <span className="text-sm font-medium leading-tight">{filing.title}</span>
+                              {filing.source && <Badge variant="outline" className="text-xs">{filing.source}</Badge>}
                             </div>
                             {filing.notes && (
-                              <p className="text-sm text-muted-foreground">{filing.notes}</p>
+                              <p className="text-sm text-muted-foreground leading-relaxed">{filing.notes}</p>
                             )}
                             {filing.filed_at && (
                               <p className="text-xs text-muted-foreground">Filed: {filing.filed_at}</p>
@@ -584,12 +616,12 @@ export default function Editorial() {
         <TabsContent value="style">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <BookOpen className="h-5 w-5" />
+              <CardTitle className="flex items-center gap-2">
+                <BookOpen className="h-5 w-5 text-primary" />
                 <span>House guidelines</span>
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
               {styleGuideError ? (
                 <Alert variant="destructive">
                   <AlertTitle>Unable to load style guide</AlertTitle>
@@ -604,9 +636,9 @@ export default function Editorial() {
               ) : (
                 <div className="grid gap-4 md:grid-cols-2">
                   {Object.entries(guidelines).map(([key, value]) => (
-                    <div key={key} className="border rounded-lg p-4 space-y-1">
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground">{key}</p>
-                      <p className="text-sm leading-snug">{renderGuidelineValue(value)}</p>
+                    <div key={key} className="rounded-lg border bg-card p-4 shadow-sm space-y-2">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{key}</p>
+                      <p className="text-sm leading-relaxed">{renderGuidelineValue(value)}</p>
                     </div>
                   ))}
                 </div>
@@ -618,12 +650,12 @@ export default function Editorial() {
         <TabsContent value="analytics">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <ClipboardList className="h-5 w-5" />
+              <CardTitle className="flex items-center gap-2">
+                <ClipboardList className="h-5 w-5 text-primary" />
                 <span>Editorial analytics</span>
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
               {analyticsError ? (
                 <Alert variant="destructive">
                   <AlertTitle>Analytics unavailable</AlertTitle>
@@ -637,17 +669,17 @@ export default function Editorial() {
                 <p className="text-sm text-muted-foreground">No analytics data available.</p>
               ) : (
                 <div className="grid gap-4 md:grid-cols-2">
-                  <div className="border rounded-lg p-4">
+                  <div className="rounded-lg border bg-card p-4 shadow-sm">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">Total articles tracked</span>
-                      <Badge variant="secondary">{analytics.total_articles}</Badge>
+                      <Badge variant="secondary" className="text-base font-semibold">{analytics.total_articles}</Badge>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Average engagement: {analytics.average_engagement}
+                    <p className="text-xs text-muted-foreground mt-3">
+                      Average engagement: <span className="font-medium">{analytics.average_engagement}</span>
                     </p>
                   </div>
-                  <div className="border rounded-lg p-4">
-                    <div className="flex items-center space-x-2">
+                  <div className="rounded-lg border bg-card p-4 shadow-sm">
+                    <div className="flex items-center gap-2">
                       <Lightbulb className="h-4 w-4 text-primary" />
                       <span className="text-sm font-medium">Top topics</span>
                     </div>
@@ -663,16 +695,16 @@ export default function Editorial() {
                       </div>
                     )}
                   </div>
-                  <div className="border rounded-lg p-4">
-                    <div className="flex items-center space-x-2">
+                  <div className="rounded-lg border bg-card p-4 shadow-sm">
+                    <div className="flex items-center gap-2">
                       <CheckCircle className="h-4 w-4 text-primary" />
                       <span className="text-sm font-medium">Readability score</span>
                     </div>
-                    <p className="text-xl font-semibold mt-2">{analytics.readability_score}</p>
-                    <p className="text-xs text-muted-foreground">Higher scores indicate easier reading experience.</p>
+                    <p className="text-2xl font-bold mt-3">{analytics.readability_score}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Higher scores indicate easier reading experience.</p>
                   </div>
-                  <div className="border rounded-lg p-4">
-                    <div className="flex items-center space-x-2">
+                  <div className="rounded-lg border bg-card p-4 shadow-sm">
+                    <div className="flex items-center gap-2">
                       <FileText className="h-4 w-4 text-primary" />
                       <span className="text-sm font-medium">Performance trends</span>
                     </div>
@@ -695,15 +727,15 @@ export default function Editorial() {
         <TabsContent value="draft">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Sparkles className="h-5 w-5" />
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
                 <span>Generate full draft</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              <form className="space-y-4" onSubmit={handleDraftSubmit}>
-                <div className="grid gap-4 lg:grid-cols-2">
-                  <div className="space-y-1">
+              <form className="space-y-6" onSubmit={handleDraftSubmit}>
+                <div className="grid gap-6 lg:grid-cols-2">
+                  <div className="space-y-2">
                     <label htmlFor="market-summary" className="text-sm font-medium">
                       Market summary
                     </label>
@@ -713,13 +745,14 @@ export default function Editorial() {
                       onChange={(event) => setMarketSummary(event.target.value)}
                       rows={6}
                       placeholder="Summarize the market tone, key drivers, or macro backdrop..."
+                      className="resize-none"
                     />
                     <p className="text-xs text-muted-foreground">
                       This summary anchors the narrative. You can leave it blank if the context checklist has sufficient detail.
                     </p>
                   </div>
-                  <div className="space-y-3">
-                    <div className="space-y-1">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
                       <label className="text-sm font-medium">Tone</label>
                       <Select value={tonePreset} onValueChange={(value) => setTonePreset(value)}>
                         <SelectTrigger id="tone-select">
@@ -735,7 +768,7 @@ export default function Editorial() {
                       </Select>
                     </div>
                     {tonePreset === "custom" && (
-                      <div className="space-y-1">
+                      <div className="space-y-2">
                         <label htmlFor="custom-tone" className="text-sm font-medium">
                           Describe custom tone
                         </label>
@@ -747,9 +780,9 @@ export default function Editorial() {
                         />
                       </div>
                     )}
-                    <div className="space-y-1">
+                    <div className="space-y-2">
                       <label htmlFor="custom-context" className="text-sm font-medium">
-                        Additional context (optional)
+                        Additional context
                       </label>
                       <Textarea
                         id="custom-context"
@@ -757,18 +790,28 @@ export default function Editorial() {
                         onChange={(event) => setCustomContext(event.target.value)}
                         rows={4}
                         placeholder="Enter extra bullet points, one per line."
+                        className="resize-none"
                       />
                       <p className="text-xs text-muted-foreground">
                         Use one idea per line. These will be passed to the assistant as additional talking points.
                       </p>
                     </div>
-                    <div className="rounded-md border p-3 text-xs text-muted-foreground">
-                      <p>Selected context</p>
-                      <ul className="mt-1 space-y-1">
-                        <li>Articles: {selectedCounts.articles}</li>
-                        <li>Reports: {selectedCounts.reports}</li>
-                        <li>Filings: {selectedCounts.filings}</li>
-                      </ul>
+                    <div className="rounded-lg border bg-muted/50 p-4">
+                      <p className="text-xs font-medium text-muted-foreground mb-2">Selected context</p>
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <div className="flex items-center gap-1.5">
+                          <FileText className="h-3 w-3 text-primary" />
+                          <span>{selectedCounts.articles}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <ClipboardList className="h-3 w-3 text-primary" />
+                          <span>{selectedCounts.reports}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <BookOpen className="h-3 w-3 text-primary" />
+                          <span>{selectedCounts.filings}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -801,70 +844,70 @@ export default function Editorial() {
           </Card>
 
           {draftData && (
-            <Card className="mt-6">
-              <CardHeader>
-                <CardTitle className="text-2xl font-semibold">{draftData.headline}</CardTitle>
+            <Card className="mt-6 border-primary/20">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-2xl font-bold leading-tight">{draftData.headline}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                <p className="text-lg text-muted-foreground">{draftData.subheadline}</p>
-                <div className="prose prose-sm max-w-none dark:prose-invert">
+                <p className="text-lg text-muted-foreground leading-relaxed">{draftData.subheadline}</p>
+                <div className="prose prose-sm max-w-none dark:prose-invert prose-headings:font-bold prose-p:leading-relaxed">
                   <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
                     {draftData.article}
                   </ReactMarkdown>
                 </div>
 
                 {draftData.key_points.length > 0 && (
-                  <section className="space-y-2">
+                  <section className="rounded-lg border bg-muted/30 p-4 space-y-3">
                     <h4 className="flex items-center gap-2 text-sm font-semibold uppercase text-muted-foreground">
-                      <CheckCircle className="h-4 w-4" /> Key points
+                      <CheckCircle className="h-4 w-4 text-primary" /> Key points
                     </h4>
-                    <ul className="ml-6 list-disc space-y-1 text-sm">
+                    <ul className="ml-6 list-disc space-y-2 text-sm">
                       {draftData.key_points.map((point, index) => (
-                        <li key={`key-point-${index}`}>{point}</li>
+                        <li key={`key-point-${index}`} className="leading-relaxed">{point}</li>
                       ))}
                     </ul>
                   </section>
                 )}
 
                 {draftData.next_steps.length > 0 && (
-                  <section className="space-y-2">
+                  <section className="rounded-lg border bg-muted/30 p-4 space-y-3">
                     <h4 className="flex items-center gap-2 text-sm font-semibold uppercase text-muted-foreground">
-                      <ClipboardList className="h-4 w-4" /> Next steps
+                      <ClipboardList className="h-4 w-4 text-primary" /> Next steps
                     </h4>
-                    <ul className="ml-6 list-disc space-y-1 text-sm">
+                    <ul className="ml-6 list-disc space-y-2 text-sm">
                       {draftData.next_steps.map((step, index) => (
-                        <li key={`next-step-${index}`}>{step}</li>
+                        <li key={`next-step-${index}`} className="leading-relaxed">{step}</li>
                       ))}
                     </ul>
                   </section>
                 )}
 
                 {draftData.data_callouts.length > 0 && (
-                  <section className="space-y-2">
+                  <section className="rounded-lg border bg-muted/30 p-4 space-y-3">
                     <h4 className="flex items-center gap-2 text-sm font-semibold uppercase text-muted-foreground">
-                      <FileText className="h-4 w-4" /> Data callouts
+                      <FileText className="h-4 w-4 text-primary" /> Data callouts
                     </h4>
-                    <ul className="ml-6 list-disc space-y-1 text-sm">
+                    <ul className="ml-6 list-disc space-y-2 text-sm">
                       {draftData.data_callouts.map((callout, index) => (
-                        <li key={`data-callout-${index}`}>{callout}</li>
+                        <li key={`data-callout-${index}`} className="leading-relaxed">{callout}</li>
                       ))}
                     </ul>
                   </section>
                 )}
 
-                <Alert>
-                  <AlertTitle>Risk disclaimer</AlertTitle>
-                  <AlertDescription>{draftData.risk_disclaimer}</AlertDescription>
+                <Alert className="border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20">
+                  <AlertTitle className="text-amber-900 dark:text-amber-100">Risk disclaimer</AlertTitle>
+                  <AlertDescription className="text-amber-800 dark:text-amber-200 text-sm leading-relaxed">{draftData.risk_disclaimer}</AlertDescription>
                 </Alert>
 
                 {draftData.context_digest.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium uppercase text-muted-foreground">
+                  <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Context applied
                     </p>
                     <div className="flex flex-wrap gap-2">
                       {draftData.context_digest.map((item, index) => (
-                        <Badge key={`context-digest-${index}`} variant="outline">
+                        <Badge key={`context-digest-${index}`} variant="secondary" className="text-xs">
                           {item}
                         </Badge>
                       ))}
