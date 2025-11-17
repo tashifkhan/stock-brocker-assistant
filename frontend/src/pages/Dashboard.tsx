@@ -1,400 +1,255 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import React from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-	BarChart3,
-	FileText,
-	PenTool,
-	TrendingUp,
-	Bell,
-	ArrowRight,
-	Activity,
-	DollarSign,
-	Users,
-	FileBarChart,
-	Loader,
-	AlertCircle,
+import { 
+  FileText, 
+  Edit3, 
+  FileBarChart, 
+  TrendingUp, 
+  Bell,
+  Database,
+  Cloud,
+  Cpu,
+  Code,
+  Brain
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { useMarketSummaryDaily, useScrapeArticles } from "@/hooks/useApi";
-import { Skeleton } from "@/components/ui/skeleton";
-import type { Article } from "@/lib/api";
 
-const quickAccessCards = [
-	{
-		title: "Financial Data Analysis",
-		description:
-			"Upload and analyze financial documents with AI-powered insights",
-		icon: BarChart3,
-		url: "/financial-data",
-		color: "bg-blue-50 border-blue-200",
-		iconColor: "text-blue-600",
-	},
-	{
-		title: "Editorial Assistant",
-		description: "AI-powered writing assistance for Google Docs integration",
-		icon: PenTool,
-		url: "/editorial",
-		color: "bg-green-50 border-green-200",
-		iconColor: "text-green-600",
-	},
-	{
-		title: "Broker Report Articles",
-		description: "Generate synthesized articles from multiple broker reports",
-		icon: FileText,
-		url: "/broker-reports",
-		color: "bg-purple-50 border-purple-200",
-		iconColor: "text-purple-600",
-	},
-	{
-		title: "Market Summary",
-		description: "Automated daily financial market summaries and insights",
-		icon: TrendingUp,
-		url: "/market-summary",
-		color: "bg-orange-50 border-orange-200",
-		iconColor: "text-orange-600",
-	},
-	{
-		title: "Corporate Filings Alerts",
-		description: "Real-time notifications for corporate filing updates",
-		icon: Bell,
-		url: "/filings-alerts",
-		color: "bg-red-50 border-red-200",
-		iconColor: "text-red-600",
-	},
-];
+const Dashboard = () => {
+  const Shell: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className }) => (
+    <div className={`relative group ${className ?? ""}`}>
+      <div className="absolute -inset-[1.5px] rounded-2xl bg-gradient-to-r from-primary/40 via-accent/40 to-secondary/40 blur opacity-70 group-hover:opacity-100 transition duration-500" />
+      <Card className="relative rounded-2xl border border-slate-200/60 dark:border-white/10 bg-white/70 dark:bg-slate-900/50 backdrop-blur-md shadow-lg">
+        {children}
+      </Card>
+    </div>
+  );
+  const projects = [
+    {
+      id: 1,
+      title: "Financial Data Extraction & Analysis Application",
+      description: "A web application that processes unstructured financial statements (press releases, reports) to extract and structure key financial metrics. Includes performance analysis tailored to company type (e.g., Banks, REITs, Corporations) and an administrative dashboard for usage analytics.",
+      icon: FileText,
+      deliverables: [
+        "User interface for file upload and results display",
+        "Fully deployed web application",
+        "Administrative dashboard for user statistics"
+      ]
+    },
+    {
+      id: 2,
+      title: "AI-Powered Editorial Assistant for Google Docs",
+      description: "A custom AI editor that improves editorial quality and consistency by providing AI-driven suggestions. Features include headline generation, style guide adherence, tone and readability checks, and automated formatting corrections.",
+      icon: Edit3,
+      deliverables: [
+        '"Generate Headlines" module',
+        '"Edit with AI" module aligned with client style guide',
+        "Dashboard for user analytics",
+        "User manuals and quick-start guides",
+        "User testing at each development phase"
+      ]
+    },
+    {
+      id: 3,
+      title: "Broker Report Article Generation Tool",
+      description: "A web application that synthesizes multiple broker reports into a single article, highlighting changes in stock recommendations, target prices, and other key takeaways. Includes an administrative dashboard for analytics.",
+      icon: FileBarChart,
+      deliverables: [
+        "Deployed application for broker report processing",
+        "Dashboard for user statistics and continuous improvement"
+      ]
+    },
+    {
+      id: 4,
+      title: "Automated Daily Financial Market Summary",
+      description: "An end-to-end system that scrapes public financial websites to generate a templated daily market summary article with charts. Covers stock index performance, market breadth, trading volumes, top/bottom performers, regional market performance, and analyst quotes.",
+      icon: TrendingUp,
+      deliverables: [
+        "Automated data extraction system",
+        "Two types of auto-generated daily charts",
+        "Dashboard for analytics and improvement"
+      ]
+    },
+    {
+      id: 5,
+      title: "Corporate Filings Alert System",
+      description: "A monitoring tool that tracks corporate financial report filings with a regulatory authority. Sends alerts for companies on a user-configurable watch list.",
+      icon: Bell,
+      deliverables: [
+        "Functional automated filing tracker",
+        "Integrated notification system",
+        "User management for watch list"
+      ]
+    }
+  ];
 
-const recentActivity = [
-	{
-		action: "Market Summary for July 23, 2025 generated",
-		time: "2 hours ago",
-		type: "success",
-	},
-	{
-		action: "New filing detected for AAPL - Form 10-K",
-		time: "4 hours ago",
-		type: "alert",
-	},
-	{
-		action: "Financial analysis completed for Q2 Report",
-		time: "6 hours ago",
-		type: "info",
-	},
-	{
-		action: "Broker report article published: Tech Sector Analysis",
-		time: "1 day ago",
-		type: "success",
-	},
-	{
-		action: "Editorial suggestions applied to 5 documents",
-		time: "1 day ago",
-		type: "info",
-	},
-];
+  const techStack = [
+    { name: "React.js", icon: Code, category: "Frontend" },
+    { name: "Python (FastAPI)", icon: Code, category: "Backend" },
+    { name: "Gemini API", icon: Brain, category: "AI/ML" },
+    { name: "Hugging Face", icon: Brain, category: "AI/ML" },
+    { name: "RAG & Chroma DB", icon: Brain, category: "AI/ML" },
+    { name: "BeautifulSoup", icon: FileText, category: "Data Extraction" },
+    { name: "Scrapy", icon: FileText, category: "Data Extraction" },
+    { name: "Pandas", icon: FileText, category: "Data Extraction" },
+    { name: "MongoDB", icon: Database, category: "Database" },
+    { name: "GCP", icon: Cloud, category: "Deployment" }
+  ];
 
-const keyMetrics = [
-	{
-		title: "Documents Analyzed",
-		value: "1,247",
-		change: "+12%",
-		icon: FileBarChart,
-		color: "text-blue-600",
-	},
-	{
-		title: "Articles Generated",
-		value: "89",
-		change: "+5%",
-		icon: FileText,
-		color: "text-green-600",
-	},
-	{
-		title: "Active Alerts",
-		value: "156",
-		change: "+8%",
-		icon: Bell,
-		color: "text-orange-600",
-	},
-	{
-		title: "Total Users",
-		value: "45",
-		change: "+3%",
-		icon: Users,
-		color: "text-purple-600",
-	},
-];
+  const objectives = [
+    "Increase efficiency, speed, and consistency in financial news reporting",
+    "Automate repetitive editorial and analytical tasks",
+    "Provide actionable insights through AI-powered data processing",
+    "Enable real-time monitoring of corporate filings and market movements"
+  ];
 
-export default function Dashboard() {
-	const navigate = useNavigate();
-	const { data: marketSummary, isLoading: marketLoading, error: marketError } = useMarketSummaryDaily();
-	const {
-		data: articlesData,
-		isLoading: articlesLoading,
-		error: articlesError,
-	} = useScrapeArticles({ count: 5, maxArticles: 12 });
+  return (
+    <div className="relative min-h-screen bg-gradient-to-b from-background via-background to-background">
 
-	const recentArticles = (articlesData?.articles ?? []).slice(0, 3) as Article[];
+      {/* Hero Section */}
+      <section className="relative overflow-hidden">
+        <div className="">
+          <div className="container mx-auto max-w-6xl px-4 pt-16 pb-14">
+            <div className="text-center">
+              <h1 className="text-4xl md:text-6xl font-bold leading-tight">
+                <span className="bg-clip-text text-transparent bg-gradient-to-r from-primary via-accent to-secondary">
+                  AI-Powered Financial Content & Workflow Automation
+                </span>
+              </h1>
+              <p className="mx-auto mt-5 max-w-3xl text-lg md:text-xl text-slate-600 dark:text-slate-300">
+                Transform financial content creation, editorial workflows, and market analysis with elegant, production-ready AI tools.
+              </p>
+              <div className="mt-8 flex items-center justify-center gap-3">
+                <a href="#projects" className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-primary to-accent px-5 py-3 text-primary-foreground shadow-lg hover:scale-[1.02] active:scale-[0.99] transition">
+                  Explore Projects
+                </a>
+                <a href="#overview" className="inline-flex items-center gap-2 rounded-lg border border-border bg-card text-foreground backdrop-blur px-5 py-3 shadow-sm hover:bg-card/90 transition">
+                  Learn More
+                </a>
+              </div>
+              <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
+                <Badge variant="secondary" className="bg-card/80 backdrop-blur border border-border">React</Badge>
+                <Badge variant="secondary" className="bg-card/80 backdrop-blur border border-border">FastAPI</Badge>
+                <Badge variant="secondary" className="bg-card/80 backdrop-blur border border-border">MongoDB</Badge>
+                <Badge variant="secondary" className="bg-card/80 backdrop-blur border border-border">Gemini</Badge>
+                <Badge variant="secondary" className="bg-card/80 backdrop-blur border border-border">Hugging Face</Badge>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
-	const formatArticleSource = (link?: string) => {
-		if (!link) return "Unknown source";
-		try {
-			const host = new URL(link).hostname.replace(/^www\./, "");
-			return host || "Unknown source";
-		} catch (error) {
-			return link;
-		}
-	};
+      <div className="container mx-auto max-w-6xl px-4 py-12">
+        {/* Overview Section */}
+        <section id="overview" className="scroll-mt-24">
+          <Shell className="mb-12">
+            <CardHeader>
+              <CardTitle className="text-3xl">Overview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-lg text-muted-foreground leading-relaxed">
+                This project is a collection of AI-driven tools designed to automate and enhance financial content creation,
+                editorial processes, and market data analysis. The suite includes applications for extracting financial data,
+                assisting editors, generating broker report summaries, producing automated market summaries, and monitoring
+                corporate filings.
+              </p>
+            </CardContent>
+          </Shell>
+        </section>
 
-	const formatArticleDate = (value?: string | null) => {
-		if (!value) return "";
-		const parsed = new Date(value);
-		if (Number.isNaN(parsed.getTime())) {
-			return value;
-		}
-		return parsed.toLocaleDateString(undefined, {
-			month: "short",
-			day: "numeric",
-		});
-	};
+        {/* Objectives Section */}
+        <section id="objectives" className="scroll-mt-24">
+          <Shell className="mb-12">
+            <CardHeader>
+              <CardTitle className="text-3xl">Objectives</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="grid sm:grid-cols-2 gap-3">
+                {objectives.map((objective, index) => (
+                  <li key={index} className="flex items-start rounded-lg border border-border bg-card/70 backdrop-blur p-3">
+                    <span className="mt-1 mr-3 inline-block h-2 w-2 flex-shrink-0 rounded-full bg-gradient-to-r from-primary to-accent" />
+                    <span className="text-base md:text-lg text-muted-foreground">{objective}</span>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Shell>
+        </section>
 
-	// Transform market data for display
-	const topGainers = marketSummary?.top_gainers?.slice(0, 3) || [];
-	const topLosers = marketSummary?.top_losers?.slice(0, 2) || [];
+        {/* Projects Section */}
+        <section id="projects" className="scroll-mt-24 mb-12">
+          <div className="text-center mb-10">
+            <h2 className="text-3xl md:text-4xl font-bold">
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-primary via-accent to-secondary">Projects & Deliverables</span>
+            </h2>
+            <p className="mt-3 text-slate-600 dark:text-slate-300">Elegant apps, pragmatic features, production-ready quality.</p>
+          </div>
+          <div className="grid md:grid-cols-2 gap-8">
+            {projects.map((project) => {
+              const IconComponent = project.icon;
+              return (
+                <Shell key={project.id}>
+                  <CardHeader>
+                    <div className="flex items-start gap-4">
+                      <div className="p-3 rounded-xl bg-muted text-primary">
+                        <IconComponent className="w-8 h-8" />
+                      </div>
+                      <div className="flex-1">
+                        <CardTitle className="text-2xl mb-2">{project.title}</CardTitle>
+                        <CardDescription className="text-base leading-relaxed">
+                          {project.description}
+                        </CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <h4 className="font-semibold mb-3 text-lg">Deliverables</h4>
+                    <ul className="space-y-2">
+                      {project.deliverables.map((deliverable, index) => (
+                        <li key={index} className="flex items-start">
+                          <span className="mt-2 mr-3 inline-block h-1.5 w-1.5 flex-shrink-0 rounded-full bg-gradient-to-r from-primary to-accent" />
+                          <span className="text-muted-foreground">{deliverable}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Shell>
+              );
+            })}
+          </div>
+        </section>
 
-	return (
-		<div className="space-y-6">
-			{/* Welcome Section */}
-			<div className="space-y-2">
-				<h1 className="text-3xl font-bold text-foreground">Welcome back</h1>
-				<p className="text-muted-foreground">
-					Here's an overview of your financial AI tools and recent activity.
-				</p>
-			</div>
+        {/* Technology Stack Section */}
+        <section id="tech" className="scroll-mt-24">
+          <Shell>
+            <CardHeader>
+              <CardTitle className="text-3xl">Technology Stack</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {techStack.map((tech, index) => {
+                  const IconComponent = tech.icon;
+                  return (
+                    <div
+                      key={index}
+                      className="flex items-center gap-3 p-4 rounded-xl border border-border bg-card/70 backdrop-blur hover:translate-y-[-2px] hover:shadow transition"
+                    >
+                      <IconComponent className="w-6 h-6 text-primary flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold truncate">{tech.name}</p>
+                        <Badge variant="secondary" className="text-[10px] mt-1">
+                          {tech.category}
+                        </Badge>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Shell>
+        </section>
+      </div>
+    </div>
+  );
+};
 
-			{/* Key Metrics */}
-			<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-				{keyMetrics.map((metric) => (
-					<Card key={metric.title}>
-						<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-							<CardTitle className="text-sm font-medium">
-								{metric.title}
-							</CardTitle>
-							<metric.icon className={`h-4 w-4 ${metric.color}`} />
-						</CardHeader>
-						<CardContent>
-							<div className="text-2xl font-bold">{metric.value}</div>
-							<p className="text-xs text-muted-foreground">
-								<span className="text-green-600">{metric.change}</span> from
-								last month
-							</p>
-						</CardContent>
-					</Card>
-				))}
-			</div>
-
-			{/* Quick Access Cards */}
-			<div className="space-y-4">
-				<h2 className="text-2xl font-semibold text-foreground">Quick Access</h2>
-				<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-					{quickAccessCards.map((card) => (
-						<Card
-							key={card.title}
-							className={`${card.color} hover:shadow-md transition-shadow cursor-pointer`}
-						>
-							<CardHeader>
-								<div className="flex items-center space-x-2">
-									<card.icon className={`h-6 w-6 ${card.iconColor}`} />
-									<CardTitle className="text-lg">{card.title}</CardTitle>
-								</div>
-							</CardHeader>
-							<CardContent>
-								<p className="text-muted-foreground mb-4">{card.description}</p>
-								<Button
-									variant="ghost"
-									className="w-full justify-between"
-									onClick={() => navigate(card.url)}
-								>
-									Get Started
-									<ArrowRight className="h-4 w-4" />
-								</Button>
-							</CardContent>
-						</Card>
-					))}
-				</div>
-			</div>
-
-			{/* Market Data and Articles */}
-			<div className="grid gap-6 lg:grid-cols-2">
-				{/* Market Summary */}
-				<Card>
-					<CardHeader>
-						<CardTitle className="flex items-center space-x-2">
-							<TrendingUp className="h-5 w-5" />
-							<span>Market Overview</span>
-						</CardTitle>
-					</CardHeader>
-					<CardContent>
-						{marketLoading ? (
-							<div className="space-y-4">
-								<Skeleton className="h-4 w-full" />
-								<Skeleton className="h-4 w-3/4" />
-							</div>
-						) : marketError ? (
-							<div className="flex items-center space-x-2 text-red-600 text-sm">
-								<AlertCircle className="h-4 w-4" />
-								<span>Failed to load market data</span>
-							</div>
-						) : (
-							<div className="space-y-4">
-								<div>
-									<p className="text-xs text-muted-foreground mb-2">Top Gainers</p>
-									<div className="space-y-2">
-										{topGainers.map((gainer: any) => (
-											<div key={gainer.symbol} className="flex justify-between items-center">
-												<span className="text-sm font-medium">{gainer.symbol}</span>
-												<Badge className="bg-green-100 text-green-800">
-													+{gainer.change_percent.toFixed(2)}%
-												</Badge>
-											</div>
-										))}
-									</div>
-								</div>
-								<div className="pt-2 border-t">
-									<p className="text-xs text-muted-foreground mb-2">Top Losers</p>
-									<div className="space-y-2">
-										{topLosers.map((loser: any) => (
-											<div key={loser.symbol} className="flex justify-between items-center">
-												<span className="text-sm font-medium">{loser.symbol}</span>
-												<Badge className="bg-red-100 text-red-800">
-													{loser.change_percent.toFixed(2)}%
-												</Badge>
-											</div>
-										))}
-									</div>
-								</div>
-							</div>
-						)}
-						<Button variant="outline" className="w-full mt-4">
-							View Full Market Data
-						</Button>
-					</CardContent>
-				</Card>
-
-				{/* Recent Articles */}
-				<Card>
-					<CardHeader>
-						<CardTitle className="flex items-center space-x-2">
-							<FileText className="h-5 w-5" />
-							<span>Recent Articles</span>
-						</CardTitle>
-					</CardHeader>
-					<CardContent>
-						{articlesLoading ? (
-							<div className="space-y-4">
-								<Skeleton className="h-4 w-full" />
-								<Skeleton className="h-4 w-full" />
-							</div>
-						) : articlesError ? (
-							<div className="flex items-center space-x-2 text-red-600 text-sm">
-								<AlertCircle className="h-4 w-4" />
-								<span>Failed to load articles</span>
-							</div>
-						) : (
-							<div className="space-y-3">
-								{recentArticles.map((article, index) => {
-									const articleDate = formatArticleDate(article.publish_date);
-									return (
-										<div key={`${article.link}-${index}`} className="border-b pb-3 last:border-b-0">
-											<p className="text-sm font-medium line-clamp-2">
-												{article.title || "Untitled article"}
-											</p>
-											<div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
-												<span>{formatArticleSource(article.link)}</span>
-												{articleDate && <span>{articleDate}</span>}
-											</div>
-										</div>
-									);
-								})}
-							</div>
-						)}
-						<Button variant="outline" className="w-full mt-4" onClick={() => navigate("/broker-reports")}>
-							View All Articles
-						</Button>
-					</CardContent>
-				</Card>
-			</div>
-
-			{/* Recent Activity */}
-			<div className="grid gap-6 lg:grid-cols-2">
-				<Card>
-					<CardHeader>
-						<CardTitle className="flex items-center space-x-2">
-							<Activity className="h-5 w-5" />
-							<span>Recent Activity</span>
-						</CardTitle>
-					</CardHeader>
-					<CardContent>
-						<div className="space-y-4">
-							{recentActivity.map((activity, index) => (
-								<div key={index} className="flex items-center space-x-3">
-									<div
-										className={`w-2 h-2 rounded-full ${
-											activity.type === "success"
-												? "bg-green-500"
-												: activity.type === "alert"
-												? "bg-orange-500"
-												: "bg-blue-500"
-										}`}
-									/>
-									<div className="flex-1">
-										<p className="text-sm font-medium">{activity.action}</p>
-										<p className="text-xs text-muted-foreground">
-											{activity.time}
-										</p>
-									</div>
-								</div>
-							))}
-						</div>
-						<Button variant="outline" className="w-full mt-4">
-							View All Activity
-						</Button>
-					</CardContent>
-				</Card>
-
-				{/* Quick Stats */}
-				<Card>
-					<CardHeader>
-						<CardTitle>Today's Overview</CardTitle>
-					</CardHeader>
-					<CardContent>
-						<div className="space-y-4">
-							<div className="flex justify-between items-center">
-								<span className="text-sm text-muted-foreground">
-									Documents Processed
-								</span>
-								<Badge variant="secondary">23</Badge>
-							</div>
-							<div className="flex justify-between items-center">
-								<span className="text-sm text-muted-foreground">
-									New Alerts
-								</span>
-								<Badge variant="destructive">5</Badge>
-							</div>
-							<div className="flex justify-between items-center">
-								<span className="text-sm text-muted-foreground">
-									Articles Generated
-								</span>
-								<Badge variant="default">3</Badge>
-							</div>
-							<div className="flex justify-between items-center">
-								<span className="text-sm text-muted-foreground">
-									Market Updates
-								</span>
-								<Badge className="bg-accent text-accent-foreground">1</Badge>
-							</div>
-						</div>
-					</CardContent>
-				</Card>
-			</div>
-		</div>
-	);
-}
+export default Dashboard;
