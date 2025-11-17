@@ -156,9 +156,6 @@ export default function FinancialData() {
     <div className="space-y-6">
       <div className="space-y-3">
         <div className="flex items-center gap-3">
-          <div className="p-3 rounded-lg bg-primary/10">
-            <BarChart3 className="h-8 w-8 text-primary" />
-          </div>
           <div>
             <h1 className="text-3xl font-bold text-foreground">Financial Data Analysis</h1>
             <p className="text-muted-foreground mt-1">
