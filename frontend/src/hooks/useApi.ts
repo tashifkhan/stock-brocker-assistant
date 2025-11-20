@@ -266,19 +266,21 @@ export function useFullReportAnalysis() {
 
 // ============ FILINGS HOOKS ============
 
-export function useUSFilings(count: number = 10) {
+export function useUSFilings(count: number = 10, enabled: boolean = true) {
   return useQuery({
     queryKey: ["filings", "us", count],
     queryFn: () => filingsApi.getUSFilings(count),
+    enabled,
     staleTime: 10 * 60 * 1000,
     gcTime: 60 * 60 * 1000,
   });
 }
 
-export function useIndiaFilings(count: number = 10) {
+export function useIndiaFilings(count: number = 10, enabled: boolean = true) {
   return useQuery({
     queryKey: ["filings", "india", count],
     queryFn: () => filingsApi.getIndiaFilings(count),
+    enabled,
     staleTime: 10 * 60 * 1000,
     gcTime: 60 * 60 * 1000,
   });
@@ -304,6 +306,15 @@ export function useWatchlistFilings(symbols: string[], source?: string, limit?: 
     queryFn: () => filingsApi.getWatchlistFilings(symbols, source, limit),
     enabled: symbols.length > 0,
     staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
+}
+
+export function useMarketFilingsHistory(source?: string, limit: number = 50) {
+  return useQuery({
+    queryKey: ["filings", "history", source, limit],
+    queryFn: () => filingsApi.getHistory(source, limit),
+    staleTime: 2 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
   });
 }

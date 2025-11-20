@@ -93,7 +93,7 @@ async def save_market_filings(source: str, filings: List[dict]) -> None:
             {
                 "$set": {
                     "source": source,
-                    "title": filing.get("title", ""),
+                    "title": filing.get("title") or filing.get("company") or "",
                     "link": link,
                     "meta": meta,
                     "updated_at": now,
