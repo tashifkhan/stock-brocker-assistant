@@ -14,7 +14,13 @@ import {
 	DialogTitle,
 	DialogFooter,
 } from "@/components/ui/dialog";
-import { useScrapeArticles, useSavedArticles, useListFavorites, useAddFavorite, useRemoveFavorite } from "@/hooks/useApi";
+import {
+	useScrapeArticles,
+	useSavedArticles,
+	useListFavorites,
+	useAddFavorite,
+	useRemoveFavorite,
+} from "@/hooks/useApi";
 import {
 	FileText,
 	Download,
@@ -31,8 +37,8 @@ import {
 	ExternalLink,
 	AlertCircle,
 	RefreshCw,
- 	Loader2,
-    Heart,
+	Loader2,
+	Heart,
 } from "lucide-react";
 
 const dataSourcesConfig = [
@@ -135,7 +141,10 @@ function deriveSource(rawSource?: string | null, link?: string): string {
 	}
 }
 
-function parsePublishDate(value?: string | null): { formatted: string; date: Date | null } {
+function parsePublishDate(value?: string | null): {
+	formatted: string;
+	date: Date | null;
+} {
 	if (!value) {
 		return { formatted: "Unknown publish date", date: null };
 	}
@@ -161,7 +170,9 @@ function getSourceMeta(source: string) {
 	const match = SOURCE_LOOKUP.find((entry) =>
 		source.toLowerCase().includes(entry.match)
 	);
-	return match ? { label: match.label, color: match.color } : DEFAULT_SOURCE_META;
+	return match
+		? { label: match.label, color: match.color }
+		: DEFAULT_SOURCE_META;
 }
 
 export default function BrokerReports() {
@@ -169,13 +180,15 @@ export default function BrokerReports() {
 	const [countInput, setCountInput] = useState("5");
 	const [maxArticlesInput, setMaxArticlesInput] = useState("60");
 	const [websiteInput, setWebsiteInput] = useState("");
-	const [selectedArticle, setSelectedArticle] = useState<PreparedArticle | null>(null);
+	const [selectedArticle, setSelectedArticle] =
+		useState<PreparedArticle | null>(null);
 	const [authToken, setAuthToken] = useState<string | null>(() =>
 		typeof window !== "undefined" ? localStorage.getItem("auth_token") : null
 	);
-	const [favoriteFeedback, setFavoriteFeedback] = useState<
-		{ type: "info" | "error" | "success"; text: string } | null
-	>(null);
+	const [favoriteFeedback, setFavoriteFeedback] = useState<{
+		type: "info" | "error" | "success";
+		text: string;
+	} | null>(null);
 	const [scrapeParams, setScrapeParams] = useState({
 		count: 5,
 		maxArticles: 60,
@@ -208,23 +221,48 @@ export default function BrokerReports() {
 	const favoritesQuery = useListFavorites();
 	const favoritesData = favoritesQuery.data?.favorites ?? [];
 	const favoriteIds = new Set<string>(
-		(Array.isArray(favoritesData) ? favoritesData.map((f: any) => {
-			// The backend returns ArticleInDB objects in favorites list
-			// We need to extract the _id field and convert to string
-			const id = f._id || f.id;
-			return typeof id === 'object' && id !== null ? String(id) : String(id || "");
-		}).filter(Boolean) : [])
+		Array.isArray(favoritesData)
+			? favoritesData
+					.map((f: any) => {
+						// The backend returns ArticleInDB objects in favorites list
+						// We need to extract the _id field and convert to string
+						const id = f._id || f.id;
+						return typeof id === "object" && id !== null
+							? String(id)
+							: String(id || "");
+					})
+					.filter(Boolean)
+			: []
 	);
 	const addFavoriteMutation = useAddFavorite();
 	const removeFavoriteMutation = useRemoveFavorite();
-	
+
 	const isAuthenticated = Boolean(authToken);
-	const { data: savedData, isLoading: savedLoading, isPending: savedPending, isFetching: savedFetching, isError: savedError, error: savedErrorObj, refetch: refetchSaved } = savedArticlesQuery;
-	const { data: scrapeData, isLoading: scrapeLoading, isPending: scrapePending, isFetching: scrapeFetching, isError: scrapeError, error: scrapeErrorObj, refetch: refetchScrape } = scrapeQuery;
+	const {
+		data: savedData,
+		isLoading: savedLoading,
+		isPending: savedPending,
+		isFetching: savedFetching,
+		isError: savedError,
+		error: savedErrorObj,
+		refetch: refetchSaved,
+	} = savedArticlesQuery;
+	const {
+		data: scrapeData,
+		isLoading: scrapeLoading,
+		isPending: scrapePending,
+		isFetching: scrapeFetching,
+		isError: scrapeError,
+		error: scrapeErrorObj,
+		refetch: refetchScrape,
+	} = scrapeQuery;
 
 	// Use saved articles if available, otherwise use scraped articles
 	// savedData is already an array, scrapeData.articles is also an array
-	const articles = (savedData && Array.isArray(savedData) ? savedData : scrapeData?.articles) ?? [];
+	const articles =
+		(savedData && Array.isArray(savedData) && savedData.length > 0
+			? savedData
+			: scrapeData?.articles) ?? [];
 	const isLoading = savedLoading || scrapeLoading;
 	const isPending = savedPending || scrapePending;
 	const isFetching = savedFetching || scrapeFetching;
@@ -244,7 +282,9 @@ export default function BrokerReports() {
 				article.text,
 				article.source,
 				Array.isArray(authorsList) ? authorsList.join(" ") : undefined,
-				Array.isArray(article.keywords) ? article.keywords.join(" ") : undefined,
+				Array.isArray(article.keywords)
+					? article.keywords.join(" ")
+					: undefined,
 				Array.isArray(article.tags) ? article.tags.join(" ") : undefined,
 			];
 			return haystacks.some((value) =>
@@ -259,19 +299,33 @@ export default function BrokerReports() {
 			const publishInfo = parsePublishDate(article.publish_date);
 			// Handle both 'authors' and 'author' fields
 			const authorsList = article.authors || article.author || [];
-			const authors = Array.isArray(authorsList) ? authorsList.filter(Boolean) : [];
-			const keywords = Array.isArray(article.keywords) ? article.keywords.filter(Boolean) : [];
-			const tags = Array.isArray(article.tags) ? article.tags.filter(Boolean) : [];
-			const wordCount = article.text ? article.text.trim().split(/\s+/).filter(Boolean).length : 0;
+			const authors = Array.isArray(authorsList)
+				? authorsList.filter(Boolean)
+				: [];
+			const keywords = Array.isArray(article.keywords)
+				? article.keywords.filter(Boolean)
+				: [];
+			const tags = Array.isArray(article.tags)
+				? article.tags.filter(Boolean)
+				: [];
+			const wordCount = article.text
+				? article.text.trim().split(/\s+/).filter(Boolean).length
+				: 0;
 			const keyMetrics: Record<string, string> = {
 				authors: authors.length ? authors.join(", ") : "Unknown authors",
-				keywords: keywords.length ? `${keywords.length} keywords` : "No keywords",
+				keywords: keywords.length
+					? `${keywords.length} keywords`
+					: "No keywords",
 				tags: tags.length ? `${tags.length} tags` : "No tags",
 			};
 
 			// Extract and normalize the database ID
 			const rawId = article._id || article.id;
-			const dbId = rawId ? (typeof rawId === 'object' ? String(rawId) : String(rawId)) : undefined;
+			const dbId = rawId
+				? typeof rawId === "object"
+					? String(rawId)
+					: String(rawId)
+				: undefined;
 
 			return {
 				id: article.link || `article-${index}`,
@@ -337,7 +391,9 @@ export default function BrokerReports() {
 			totalWords += report.wordCount;
 		});
 
-		const sortedKeywords = [...keywordCounts.entries()].sort((a, b) => b[1] - a[1]);
+		const sortedKeywords = [...keywordCounts.entries()].sort(
+			(a, b) => b[1] - a[1]
+		);
 		const sortedTags = [...tagCounts.entries()].sort((a, b) => b[1] - a[1]);
 
 		return {
@@ -356,10 +412,16 @@ export default function BrokerReports() {
 			return [] as Array<{ title: string; description: string; color: string }>;
 		}
 
-		const highlights: Array<{ title: string; description: string; color: string }> = [];
+		const highlights: Array<{
+			title: string;
+			description: string;
+			color: string;
+		}> = [];
 		const articleLabel = preparedReports.length === 1 ? "article" : "articles";
-		const sourceLabel = aggregatedStats.uniqueSources === 1 ? "source" : "sources";
-		const authorLabel = aggregatedStats.uniqueAuthors === 1 ? "author" : "authors";
+		const sourceLabel =
+			aggregatedStats.uniqueSources === 1 ? "source" : "sources";
+		const authorLabel =
+			aggregatedStats.uniqueAuthors === 1 ? "author" : "authors";
 
 		highlights.push({
 			title: `Collected ${preparedReports.length} ${articleLabel}`,
@@ -398,8 +460,12 @@ export default function BrokerReports() {
 	const handleExtract = async () => {
 		const parsedCount = Number.parseInt(countInput, 10);
 		const parsedMax = Number.parseInt(maxArticlesInput, 10);
-		const safeCount = Number.isNaN(parsedCount) ? scrapeParams.count : Math.max(1, parsedCount);
-		const safeMax = Number.isNaN(parsedMax) ? scrapeParams.maxArticles : Math.max(1, parsedMax);
+		const safeCount = Number.isNaN(parsedCount)
+			? scrapeParams.count
+			: Math.max(1, parsedCount);
+		const safeMax = Number.isNaN(parsedMax)
+			? scrapeParams.maxArticles
+			: Math.max(1, parsedMax);
 		const websites = parseWebsiteInput(websiteInput);
 
 		setScrapeParams({
@@ -407,7 +473,7 @@ export default function BrokerReports() {
 			maxArticles: safeMax,
 			websites,
 		});
-		
+
 		// Trigger scraping with new params
 		await refetchScrape();
 		// Refresh saved articles after scraping
@@ -581,14 +647,14 @@ export default function BrokerReports() {
 							<Button onClick={handleExtract} disabled={loadingState}>
 								<Search className="h-4 w-4 mr-1" />
 								{loadingState ? "Extracting" : "Extract Reports"}
-						</Button>
-					</div>
-
-					{scrapeData?.message ? (
-						<div className="text-xs text-muted-foreground">
-							Status: {scrapeData.message}
+							</Button>
 						</div>
-					) : null}
+
+						{scrapeData?.message ? (
+							<div className="text-xs text-muted-foreground">
+								Status: {scrapeData.message}
+							</div>
+						) : null}
 					</div>
 				</CardContent>
 			</Card>
@@ -621,7 +687,7 @@ export default function BrokerReports() {
 										: favoriteFeedback.type === "success"
 										? "border-green-500 text-green-600"
 										: "border-border text-muted-foreground"
-									}`}
+								}`}
 							>
 								{favoriteFeedback.text}
 							</div>
@@ -638,173 +704,213 @@ export default function BrokerReports() {
 							</div>
 						) : preparedReports.length === 0 ? (
 							<p className="text-sm text-muted-foreground">
-								No articles match the current filters. Adjust your query or scrape new sources.
+								No articles match the current filters. Adjust your query or
+								scrape new sources.
 							</p>
 						) : (
-						<>
-							{preparedReports.map((report) => {
-								const meta = getSourceMeta(report.source);
-								return (
-									<div
-										key={report.id}
-										className="group p-5 border rounded-lg space-y-3 hover:shadow-md hover:border-primary/50 transition-all cursor-pointer bg-card"
-										onClick={() => setSelectedArticle(report)}
-									>
-										<div className="flex items-start justify-between gap-4">
-											<div className="flex-1 min-w-0">
-												<h3 className="font-semibold text-base mb-2 line-clamp-2 group-hover:text-primary transition-colors">
-													{report.title}
-												</h3>
-												<div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground mb-2">
-													<Badge variant="outline" className="text-xs">
-														<div className={`w-2 h-2 rounded-full ${meta.color} mr-1.5`} />
-														{report.source}
+							<>
+								{preparedReports.map((report) => {
+									const meta = getSourceMeta(report.source);
+									return (
+										<div
+											key={report.id}
+											className="group p-5 border rounded-lg space-y-3 hover:shadow-md hover:border-primary/50 transition-all cursor-pointer bg-card"
+											onClick={() => setSelectedArticle(report)}
+										>
+											<div className="flex items-start justify-between gap-4">
+												<div className="flex-1 min-w-0">
+													<h3 className="font-semibold text-base mb-2 line-clamp-2 group-hover:text-primary transition-colors">
+														{report.title}
+													</h3>
+													<div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground mb-2">
+														<Badge variant="outline" className="text-xs">
+															<div
+																className={`w-2 h-2 rounded-full ${meta.color} mr-1.5`}
+															/>
+															{report.source}
+														</Badge>
+														<span className="flex items-center gap-1">
+															<Clock className="h-3 w-3" />
+															{report.extractedAt}
+														</span>
+														<span className="flex items-center gap-1">
+															<FileText className="h-3 w-3" />
+															{report.wordCount} words
+														</span>
+													</div>
+												</div>
+												<div className="flex flex-col items-end gap-2">
+													<Badge
+														variant={
+															report.sentiment === "positive"
+																? "default"
+																: report.sentiment === "negative"
+																? "destructive"
+																: "secondary"
+														}
+														className="text-xs"
+													>
+														{report.sentiment === "positive" && (
+															<TrendingUp className="h-3 w-3 mr-1" />
+														)}
+														{report.sentiment === "negative" && (
+															<TrendingDown className="h-3 w-3 mr-1" />
+														)}
+														{report.sentiment === "neutral" && (
+															<Minus className="h-3 w-3 mr-1" />
+														)}
+														{report.sentiment}
 													</Badge>
-													<span className="flex items-center gap-1">
-														<Clock className="h-3 w-3" />
-														{report.extractedAt}
-													</span>
-													<span className="flex items-center gap-1">
-														<FileText className="h-3 w-3" />
-														{report.wordCount} words
-													</span>
+													<Badge variant="outline" className="text-xs">
+														{report.status}
+													</Badge>
 												</div>
 											</div>
-											<div className="flex flex-col items-end gap-2">
-												<Badge
-													variant={
-														report.sentiment === "positive"
-															? "default"
-														: report.sentiment === "negative"
-														? "destructive"
-														: "secondary"
-													}
-													className="text-xs"
-												>
-													{report.sentiment === "positive" && (
-														<TrendingUp className="h-3 w-3 mr-1" />
+
+											<p className="text-sm text-muted-foreground leading-relaxed line-clamp-3">
+												{report.summary}
+											</p>
+
+											{report.keywords.length > 0 && (
+												<div className="flex flex-wrap gap-1.5">
+													{report.keywords.slice(0, 6).map((keyword, idx) => (
+														<Badge
+															key={idx}
+															variant="secondary"
+															className="text-xs px-2 py-0"
+														>
+															{keyword}
+														</Badge>
+													))}
+													{report.keywords.length > 6 && (
+														<Badge
+															variant="secondary"
+															className="text-xs px-2 py-0"
+														>
+															+{report.keywords.length - 6} more
+														</Badge>
 													)}
-													{report.sentiment === "negative" && (
-														<TrendingDown className="h-3 w-3 mr-1" />
+												</div>
+											)}
+
+											<div className="flex items-center justify-between pt-2 border-t">
+												<div className="flex items-center gap-3 text-xs text-muted-foreground">
+													{report.authors.length > 0 && (
+														<span className="flex items-center gap-1">
+															<span className="font-medium">By:</span>
+															{report.authors.slice(0, 2).join(", ")}
+															{report.authors.length > 2 &&
+																` +${report.authors.length - 2}`}
+														</span>
 													)}
-													{report.sentiment === "neutral" && (
-														<Minus className="h-3 w-3 mr-1" />
-													)}
-													{report.sentiment}
-												</Badge>
-												<Badge variant="outline" className="text-xs">{report.status}</Badge>
-											</div>
-										</div>
+												</div>
+												<div className="flex items-center gap-2">
+													<Button
+														variant="ghost"
+														size="sm"
+														className="text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+														onClick={(e) => {
+															e.stopPropagation();
+															setSelectedArticle(report);
+														}}
+													>
+														Read Full Article
+														<ExternalLink className="h-3 w-3 ml-1" />
+													</Button>
 
-										<p className="text-sm text-muted-foreground leading-relaxed line-clamp-3">
-											{report.summary}
-										</p>
-
-										{report.keywords.length > 0 && (
-											<div className="flex flex-wrap gap-1.5">
-												{report.keywords.slice(0, 6).map((keyword, idx) => (
-													<Badge key={idx} variant="secondary" className="text-xs px-2 py-0">
-														{keyword}
-													</Badge>
-												))}
-												{report.keywords.length > 6 && (
-													<Badge variant="secondary" className="text-xs px-2 py-0">
-														+{report.keywords.length - 6} more
-													</Badge>
-												)}
-											</div>
-										)}
-
-										<div className="flex items-center justify-between pt-2 border-t">
-											<div className="flex items-center gap-3 text-xs text-muted-foreground">
-												{report.authors.length > 0 && (
-													<span className="flex items-center gap-1">
-														<span className="font-medium">By:</span>
-														{report.authors.slice(0, 2).join(", ")}
-														{report.authors.length > 2 && ` +${report.authors.length - 2}`}
-													</span>
-												)}
-											</div>
-											<div className="flex items-center gap-2">
-												<Button
-													variant="ghost"
-													size="sm"
-													className="text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-													onClick={(e) => {
-														e.stopPropagation();
-														setSelectedArticle(report);
-													}}
-												>
-													Read Full Article
-													<ExternalLink className="h-3 w-3 ml-1" />
-												</Button>
-
-												<Button
-													variant={favoriteIds.has(report.dbId || "") ? "destructive" : "ghost"}
-													size="sm"
-													className="text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-													disabled={!report.dbId || !isAuthenticated}
-													title={!isAuthenticated ? "Sign in to favorite articles" : !report.dbId ? "Article must be saved first" : ""}
-													onClick={async (e) => {
-														e.stopPropagation();
-														if (!report.dbId) {
-															setFavoriteFeedback({
-																type: "info",
-																text: "Save the article before adding it to favorites.",
-															});
-															return;
+													<Button
+														variant={
+															favoriteIds.has(report.dbId || "")
+																? "destructive"
+																: "ghost"
 														}
-														if (!isAuthenticated) {
-															setFavoriteFeedback({
-																type: "info",
-																text: "Sign in to manage your favorite articles.",
-															});
-															return;
+														size="sm"
+														className="text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+														disabled={!report.dbId || !isAuthenticated}
+														title={
+															!isAuthenticated
+																? "Sign in to favorite articles"
+																: !report.dbId
+																? "Article must be saved first"
+																: ""
 														}
-														const alreadyFavorite = favoriteIds.has(report.dbId);
-														try {
-															if (alreadyFavorite) {
-																await removeFavoriteMutation.mutateAsync(report.dbId);
+														onClick={async (e) => {
+															e.stopPropagation();
+															if (!report.dbId) {
 																setFavoriteFeedback({
 																	type: "info",
-																	text: "Removed from favorites.",
+																	text: "Save the article before adding it to favorites.",
 																});
-															} else {
-																await addFavoriteMutation.mutateAsync(report.dbId);
+																return;
+															}
+															if (!isAuthenticated) {
 																setFavoriteFeedback({
-																	type: "success",
-																	text: "Added to favorites.",
+																	type: "info",
+																	text: "Sign in to manage your favorite articles.",
 																});
+																return;
 															}
-														} catch (err) {
-															console.error("toggle favorite failed", err);
-															const message = err instanceof Error ? err.message : "Unable to update favorite.";
-															setFavoriteFeedback({ type: "error", text: message });
-															if (message.toLowerCase().includes("credential")) {
-																localStorage.removeItem("auth_token");
-																setAuthToken(null);
+															const alreadyFavorite = favoriteIds.has(
+																report.dbId
+															);
+															try {
+																if (alreadyFavorite) {
+																	await removeFavoriteMutation.mutateAsync(
+																		report.dbId
+																	);
+																	setFavoriteFeedback({
+																		type: "info",
+																		text: "Removed from favorites.",
+																	});
+																} else {
+																	await addFavoriteMutation.mutateAsync(
+																		report.dbId
+																	);
+																	setFavoriteFeedback({
+																		type: "success",
+																		text: "Added to favorites.",
+																	});
+																}
+															} catch (err) {
+																console.error("toggle favorite failed", err);
+																const message =
+																	err instanceof Error
+																		? err.message
+																		: "Unable to update favorite.";
+																setFavoriteFeedback({
+																	type: "error",
+																	text: message,
+																});
+																if (
+																	message.toLowerCase().includes("credential")
+																) {
+																	localStorage.removeItem("auth_token");
+																	setAuthToken(null);
+																}
 															}
-														}
-													}}
-												>
-													<Heart className="h-4 w-4 mr-1" />
-													{favoriteIds.has(report.dbId || "") ? "Favorited" : "Favorite"}
-												</Button>
+														}}
+													>
+														<Heart className="h-4 w-4 mr-1" />
+														{favoriteIds.has(report.dbId || "")
+															? "Favorited"
+															: "Favorite"}
+													</Button>
+												</div>
 											</div>
 										</div>
-									</div>
-								);
-							})}								<div className="flex flex-wrap items-center justify-between gap-2 border-t pt-4 text-xs text-muted-foreground">
+									);
+								})}{" "}
+								<div className="flex flex-wrap items-center justify-between gap-2 border-t pt-4 text-xs text-muted-foreground">
 									<span>
 										Showing {filteredCount} of {totalArticles} scraped article
 										{totalArticles === 1 ? "" : "s"}.
 									</span>
 									<div className="flex items-center gap-2">
 										<Button
-										size="sm"
-										variant="secondary"
-										className="bg-accent text-accent-foreground"
-										disabled={preparedReports.length === 0}
+											size="sm"
+											variant="secondary"
+											className="bg-accent text-accent-foreground"
+											disabled={preparedReports.length === 0}
 										>
 											<FileText className="h-4 w-4 mr-1" />
 											Synthesize All Reports
@@ -839,9 +945,17 @@ export default function BrokerReports() {
 															createdCount += 1;
 														} catch (err) {
 															console.error("favorite all failed", err);
-															const message = err instanceof Error ? err.message : "Unable to favorite articles.";
-															setFavoriteFeedback({ type: "error", text: message });
-															if (message.toLowerCase().includes("credential")) {
+															const message =
+																err instanceof Error
+																	? err.message
+																	: "Unable to favorite articles.";
+															setFavoriteFeedback({
+																type: "error",
+																text: message,
+															});
+															if (
+																message.toLowerCase().includes("credential")
+															) {
 																localStorage.removeItem("auth_token");
 																setAuthToken(null);
 															}
@@ -853,12 +967,18 @@ export default function BrokerReports() {
 													type: createdCount > 0 ? "success" : "info",
 													text:
 														createdCount > 0
-															? `Favorited ${createdCount} article${createdCount === 1 ? "" : "s"}.`
-														: "All saved articles are already in favorites.",
+															? `Favorited ${createdCount} article${
+																	createdCount === 1 ? "" : "s"
+															  }.`
+															: "All saved articles are already in favorites.",
 												});
 											}}
-											disabled={preparedReports.length === 0 || !isAuthenticated}
-											title={!isAuthenticated ? "Sign in to favorite articles" : ""}
+											disabled={
+												preparedReports.length === 0 || !isAuthenticated
+											}
+											title={
+												!isAuthenticated ? "Sign in to favorite articles" : ""
+											}
 										>
 											<FileText className="h-4 w-4 mr-1" />
 											Favorite All
@@ -870,7 +990,6 @@ export default function BrokerReports() {
 					</div>
 				</CardContent>
 			</Card>
-
 
 			{/* Sample Synthesized Report View */}
 			<Card>
@@ -897,11 +1016,19 @@ export default function BrokerReports() {
 										</Badge>
 									</div>
 									<div className="flex space-x-2">
-										<Button variant="outline" size="sm" disabled={preparedReports.length === 0}>
+										<Button
+											variant="outline"
+											size="sm"
+											disabled={preparedReports.length === 0}
+										>
 											<Save className="h-4 w-4 mr-1" />
 											Save
 										</Button>
-										<Button variant="outline" size="sm" disabled={preparedReports.length === 0}>
+										<Button
+											variant="outline"
+											size="sm"
+											disabled={preparedReports.length === 0}
+										>
 											<Download className="h-4 w-4 mr-1" />
 											Export
 										</Button>
@@ -919,18 +1046,27 @@ export default function BrokerReports() {
 											<p className="text-sm text-muted-foreground mb-4">
 												Based on {preparedReports.length} article
 												{preparedReports.length === 1 ? "" : "s"} collected from
-												 {aggregatedStats.uniqueSources} source
-												{aggregatedStats.uniqueSources === 1 ? "" : "s"}, here are the active themes:
+												{aggregatedStats.uniqueSources} source
+												{aggregatedStats.uniqueSources === 1 ? "" : "s"}, here
+												are the active themes:
 											</p>
 
 											<div className="space-y-3">
 												{summaryHighlights.map((highlight, index) => (
-													<div key={index} className="flex items-start space-x-3">
-														<div className={`w-2 h-2 rounded-full ${highlight.color} mt-2`} />
+													<div
+														key={index}
+														className="flex items-start space-x-3"
+													>
+														<div
+															className={`w-2 h-2 rounded-full ${highlight.color} mt-2`}
+														/>
 														<div>
-															<p className="font-medium text-sm">{highlight.title}</p>
+															<p className="font-medium text-sm">
+																{highlight.title}
+															</p>
 															<p className="text-xs text-muted-foreground">
-																{highlight.description || "Details unavailable."}
+																{highlight.description ||
+																	"Details unavailable."}
 															</p>
 														</div>
 													</div>
@@ -962,9 +1098,13 @@ export default function BrokerReports() {
 														className="flex items-center justify-between p-3 border rounded-lg"
 													>
 														<div className="flex items-center space-x-3">
-															<div className={`w-3 h-3 rounded-full ${meta.color}`} />
+															<div
+																className={`w-3 h-3 rounded-full ${meta.color}`}
+															/>
 															<div>
-																<p className="font-medium text-sm">{report.source}</p>
+																<p className="font-medium text-sm">
+																	{report.source}
+																</p>
 																<p className="text-xs text-muted-foreground line-clamp-1">
 																	{report.title}
 																</p>
@@ -995,7 +1135,8 @@ export default function BrokerReports() {
 								<CardContent>
 									{preparedReports.length === 0 ? (
 										<p className="text-sm text-muted-foreground">
-											Scraped article metrics will appear here once data is available.
+											Scraped article metrics will appear here once data is
+											available.
 										</p>
 									) : (
 										<>
@@ -1004,25 +1145,33 @@ export default function BrokerReports() {
 													<p className="text-2xl font-bold text-primary">
 														{preparedReports.length}
 													</p>
-													<p className="text-sm text-muted-foreground">Articles collected</p>
+													<p className="text-sm text-muted-foreground">
+														Articles collected
+													</p>
 												</div>
 												<div className="text-center p-4 bg-muted/20 rounded-lg">
 													<p className="text-2xl font-bold">
 														{aggregatedStats.averageWordCount}
 													</p>
-													<p className="text-sm text-muted-foreground">Avg. word count</p>
+													<p className="text-sm text-muted-foreground">
+														Avg. word count
+													</p>
 												</div>
 												<div className="text-center p-4 bg-muted/20 rounded-lg">
 													<p className="text-2xl font-bold text-green-600">
 														{aggregatedStats.totalKeywords}
 													</p>
-													<p className="text-sm text-muted-foreground">Unique keywords</p>
+													<p className="text-sm text-muted-foreground">
+														Unique keywords
+													</p>
 												</div>
 												<div className="text-center p-4 bg-muted/20 rounded-lg">
 													<p className="text-2xl font-bold text-blue-600">
 														{aggregatedStats.totalTags}
 													</p>
-													<p className="text-sm text-muted-foreground">Unique tags</p>
+													<p className="text-sm text-muted-foreground">
+														Unique tags
+													</p>
 												</div>
 											</div>
 
@@ -1036,7 +1185,10 @@ export default function BrokerReports() {
 													) : (
 														<ul className="space-y-2 text-xs text-muted-foreground">
 															{aggregatedStats.topKeywords.map((keyword) => (
-																<li key={keyword} className="flex justify-between">
+																<li
+																	key={keyword}
+																	className="flex justify-between"
+																>
 																	<span className="capitalize">{keyword}</span>
 																	<span>Trending</span>
 																</li>
@@ -1048,11 +1200,16 @@ export default function BrokerReports() {
 													<h4 className="font-medium">Source Diversity</h4>
 													<p className="text-xs text-muted-foreground">
 														{aggregatedStats.uniqueSources} unique source
-														{aggregatedStats.uniqueSources === 1 ? "" : "s"} • {aggregatedStats.uniqueAuthors} contributor
+														{aggregatedStats.uniqueSources === 1
+															? ""
+															: "s"} • {aggregatedStats.uniqueAuthors}{" "}
+														contributor
 														{aggregatedStats.uniqueAuthors === 1 ? "" : "s"}
 													</p>
 													{aggregatedStats.topTags.length === 0 ? (
-														<p className="text-xs text-muted-foreground">Tag coverage pending.</p>
+														<p className="text-xs text-muted-foreground">
+															Tag coverage pending.
+														</p>
 													) : (
 														<ul className="space-y-2 text-xs text-muted-foreground">
 															{aggregatedStats.topTags.map((tag) => (
@@ -1078,7 +1235,8 @@ export default function BrokerReports() {
 								<CardContent>
 									{timelineReports.length === 0 ? (
 										<p className="text-sm text-muted-foreground">
-											Articles with publish dates will appear in chronological order once scraped.
+											Articles with publish dates will appear in chronological
+											order once scraped.
 										</p>
 									) : (
 										<div className="space-y-4">
@@ -1086,7 +1244,10 @@ export default function BrokerReports() {
 												<div className="absolute left-4 top-0 bottom-0 w-0.5 bg-border" />
 												<div className="space-y-6">
 													{timelineReports.map((report, index) => (
-														<div key={report.id} className="flex items-start space-x-4">
+														<div
+															key={report.id}
+															className="flex items-start space-x-4"
+														>
 															<div className="w-8 h-8 rounded-full bg-primary/80 flex items-center justify-center text-white text-xs font-medium">
 																{index + 1}
 															</div>
@@ -1103,8 +1264,8 @@ export default function BrokerReports() {
 																	{report.summary}
 																</p>
 																<p className="mt-1 text-xs text-muted-foreground">
-																		{report.extractedAt}
-																	</p>
+																	{report.extractedAt}
+																</p>
 															</div>
 														</div>
 													))}
@@ -1120,16 +1281,25 @@ export default function BrokerReports() {
 			</Card>
 
 			{/* Article Detail Modal */}
-			<Dialog open={!!selectedArticle} onOpenChange={(open) => !open && setSelectedArticle(null)}>
+			<Dialog
+				open={!!selectedArticle}
+				onOpenChange={(open) => !open && setSelectedArticle(null)}
+			>
 				<DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
 					{selectedArticle && (
 						<>
 							<DialogHeader>
-								<DialogTitle className="text-xl pr-8">{selectedArticle.title}</DialogTitle>
+								<DialogTitle className="text-xl pr-8">
+									{selectedArticle.title}
+								</DialogTitle>
 								<DialogDescription className="space-y-3 pt-2">
 									<div className="flex flex-wrap items-center gap-3 text-sm">
 										<Badge variant="outline">
-											<div className={`w-2 h-2 rounded-full ${getSourceMeta(selectedArticle.source).color} mr-1.5`} />
+											<div
+												className={`w-2 h-2 rounded-full ${
+													getSourceMeta(selectedArticle.source).color
+												} mr-1.5`}
+											/>
 											{selectedArticle.source}
 										</Badge>
 										<span className="flex items-center gap-1.5 text-muted-foreground">
@@ -1145,9 +1315,15 @@ export default function BrokerReports() {
 													: "secondary"
 											}
 										>
-											{selectedArticle.sentiment === "positive" && <TrendingUp className="h-3 w-3 mr-1" />}
-											{selectedArticle.sentiment === "negative" && <TrendingDown className="h-3 w-3 mr-1" />}
-											{selectedArticle.sentiment === "neutral" && <Minus className="h-3 w-3 mr-1" />}
+											{selectedArticle.sentiment === "positive" && (
+												<TrendingUp className="h-3 w-3 mr-1" />
+											)}
+											{selectedArticle.sentiment === "negative" && (
+												<TrendingDown className="h-3 w-3 mr-1" />
+											)}
+											{selectedArticle.sentiment === "neutral" && (
+												<Minus className="h-3 w-3 mr-1" />
+											)}
 											{selectedArticle.sentiment}
 										</Badge>
 										<span className="flex items-center gap-1.5 text-muted-foreground">
@@ -1166,14 +1342,19 @@ export default function BrokerReports() {
 
 							<div className="space-y-4 py-4">
 								{/* Keywords and Tags */}
-								{(selectedArticle.keywords.length > 0 || selectedArticle.tags.length > 0) && (
+								{(selectedArticle.keywords.length > 0 ||
+									selectedArticle.tags.length > 0) && (
 									<div className="space-y-3">
 										{selectedArticle.keywords.length > 0 && (
 											<div>
 												<h4 className="text-sm font-medium mb-2">Keywords</h4>
 												<div className="flex flex-wrap gap-1.5">
 													{selectedArticle.keywords.map((keyword, idx) => (
-														<Badge key={idx} variant="secondary" className="text-xs">
+														<Badge
+															key={idx}
+															variant="secondary"
+															className="text-xs"
+														>
 															{keyword}
 														</Badge>
 													))}
@@ -1185,7 +1366,11 @@ export default function BrokerReports() {
 												<h4 className="text-sm font-medium mb-2">Tags</h4>
 												<div className="flex flex-wrap gap-1.5">
 													{selectedArticle.tags.map((tag, idx) => (
-														<Badge key={idx} variant="outline" className="text-xs">
+														<Badge
+															key={idx}
+															variant="outline"
+															className="text-xs"
+														>
 															#{tag}
 														</Badge>
 													))}
@@ -1199,8 +1384,11 @@ export default function BrokerReports() {
 								<div className="prose prose-sm dark:prose-invert max-w-none">
 									<div className="p-4 bg-muted/30 rounded-lg border">
 										<p className="text-sm leading-relaxed whitespace-pre-wrap">
-											{filteredArticles.find((a) => 
-												(a.link || `article-${filteredArticles.indexOf(a)}`) === selectedArticle.id
+											{filteredArticles.find(
+												(a) =>
+													(a.link ||
+														`article-${filteredArticles.indexOf(a)}`) ===
+													selectedArticle.id
 											)?.text || selectedArticle.summary}
 										</p>
 									</div>
@@ -1210,15 +1398,21 @@ export default function BrokerReports() {
 								<div className="grid grid-cols-3 gap-3">
 									<div className="text-center p-3 bg-muted/20 rounded-lg">
 										<p className="text-xs text-muted-foreground">Word Count</p>
-										<p className="font-semibold text-lg">{selectedArticle.wordCount.toLocaleString()}</p>
+										<p className="font-semibold text-lg">
+											{selectedArticle.wordCount.toLocaleString()}
+										</p>
 									</div>
 									<div className="text-center p-3 bg-muted/20 rounded-lg">
 										<p className="text-xs text-muted-foreground">Keywords</p>
-										<p className="font-semibold text-lg">{selectedArticle.keywords.length}</p>
+										<p className="font-semibold text-lg">
+											{selectedArticle.keywords.length}
+										</p>
 									</div>
 									<div className="text-center p-3 bg-muted/20 rounded-lg">
 										<p className="text-xs text-muted-foreground">Status</p>
-										<p className="font-semibold text-sm capitalize">{selectedArticle.status}</p>
+										<p className="font-semibold text-sm capitalize">
+											{selectedArticle.status}
+										</p>
 									</div>
 								</div>
 							</div>
@@ -1230,10 +1424,7 @@ export default function BrokerReports() {
 								>
 									Close
 								</Button>
-								<Button
-									asChild
-									className="gap-2"
-								>
+								<Button asChild className="gap-2">
 									<a
 										href={selectedArticle.url}
 										target="_blank"
